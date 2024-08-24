@@ -1,0 +1,4 @@
+# Hashes of file build rules.
+7245036637d8418c13d7c86a569ed103 AudioDelay_artefacts/JuceLibraryCode/AudioDelay_AU/PkgInfo
+1fe0153465e2b846754d84a56af3d82d AudioDelay_artefacts/JuceLibraryCode/AudioDelay_Standalone/PkgInfo
+589db89b4bf21555cda4323740af4eea AudioDelay_artefacts/JuceLibraryCode/AudioDelay_VST3/PkgInfo
