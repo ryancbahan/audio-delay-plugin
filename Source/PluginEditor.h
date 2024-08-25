@@ -12,6 +12,8 @@ public:
 
   void paint(juce::Graphics &) override;
   void resized() override;
+  void setAllLabelsBlack();
+  void setAllKnobsBlack();
 
 private:
   AudioDelayAudioProcessor &audioProcessor;

@@ -4,7 +4,7 @@
 AudioDelayAudioProcessorEditor::AudioDelayAudioProcessorEditor(AudioDelayAudioProcessor &p)
     : AudioProcessorEditor(&p), audioProcessor(p)
 {
-  setSize(700, 400); // Increased width to accommodate the new knob
+  setSize(700, 400);
 
   auto setupKnob = [this](juce::Slider &knob, juce::Label &label, const juce::String &labelText,
                           double rangeStart, double rangeEnd, double interval)
@@ -12,10 +12,13 @@ AudioDelayAudioProcessorEditor::AudioDelayAudioProcessorEditor(AudioDelayAudioPr
     knob.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
     knob.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 80, 20);
     knob.setRange(rangeStart, rangeEnd, interval);
+    knob.setColour(juce::Slider::textBoxTextColourId, juce::Colours::black);
+    knob.setColour(juce::Slider::textBoxOutlineColourId, juce::Colours::black);
     addAndMakeVisible(knob);
 
     label.setText(labelText, juce::dontSendNotification);
     label.setJustificationType(juce::Justification::centred);
+    label.setColour(juce::Label::textColourId, juce::Colours::black);
     addAndMakeVisible(label);
   };
 
@@ -49,16 +52,15 @@ AudioDelayAudioProcessorEditor::~AudioDelayAudioProcessorEditor()
 
 void AudioDelayAudioProcessorEditor::paint(juce::Graphics &g)
 {
-  g.fillAll(juce::Colours::lightblue);
-  g.setColour(juce::Colours::black);
-  g.setFont(15.0f);
-  g.drawFittedText("Audio Delay Plugin", getLocalBounds(), juce::Justification::centred, 1);
+  g.fillAll(juce::Colours::white);
+  setAllLabelsBlack();
+  setAllKnobsBlack();
 }
 
 void AudioDelayAudioProcessorEditor::resized()
 {
   auto area = getLocalBounds().reduced(20);
-  int width = area.getWidth() / 4; // Changed from 3 to 4 to accommodate the new knob
+  int width = area.getWidth() / 4;
   int height = area.getHeight() / 2;
 
   auto layoutKnob = [this, width, height](juce::Slider &knob, juce::Label &label, int row, int col)
@@ -76,4 +78,29 @@ void AudioDelayAudioProcessorEditor::resized()
   layoutKnob(stereoWidthKnob, stereoWidthLabel, 1, 0);
   layoutKnob(panKnob, panLabel, 1, 1);
   layoutKnob(reverbKnob, reverbLabel, 1, 2);
+}
+
+void AudioDelayAudioProcessorEditor::setAllLabelsBlack()
+{
+  delayLabel.setColour(juce::Label::textColourId, juce::Colours::black);
+  feedbackLabel.setColour(juce::Label::textColourId, juce::Colours::black);
+  mixLabel.setColour(juce::Label::textColourId, juce::Colours::black);
+  bitcrushLabel.setColour(juce::Label::textColourId, juce::Colours::black);
+  stereoWidthLabel.setColour(juce::Label::textColourId, juce::Colours::black);
+  panLabel.setColour(juce::Label::textColourId, juce::Colours::black);
+  reverbLabel.setColour(juce::Label::textColourId, juce::Colours::black);
+}
+
+void AudioDelayAudioProcessorEditor::setAllKnobsBlack()
+{
+  juce::Slider *knobs[] = {&delayKnob, &feedbackKnob, &mixKnob, &bitcrushKnob, &stereoWidthKnob, &panKnob, &reverbKnob};
+
+  for (auto *knob : knobs)
+  {
+    knob->setColour(juce::Slider::textBoxTextColourId, juce::Colours::black);
+    knob->setColour(juce::Slider::textBoxOutlineColourId, juce::Colours::black);
+    knob->setColour(juce::Slider::rotarySliderFillColourId, juce::Colours::black);
+    knob->setColour(juce::Slider::rotarySliderOutlineColourId, juce::Colours::black);
+    knob->setColour(juce::Slider::thumbColourId, juce::Colours::black);
+  }
 }
