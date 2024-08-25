@@ -16,10 +16,10 @@ public:
 private:
   AudioDelayAudioProcessor &audioProcessor;
 
-  juce::Slider bitcrushSlider;
   juce::Slider delaySlider;
   juce::Slider feedbackSlider;
   juce::Slider mixSlider;
+  juce::Slider bitcrushSlider;
 
   juce::Label delayLabel;
   juce::Label feedbackLabel;

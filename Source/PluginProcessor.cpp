@@ -2,15 +2,11 @@
 #include "PluginEditor.h"
 
 AudioDelayAudioProcessor::AudioDelayAudioProcessor()
-    : AudioProcessor(BusesProperties().withInput("Input", juce::AudioChannelSet::stereo()).withOutput("Output", juce::AudioChannelSet::stereo())),
-      parameters(*this, nullptr, juce::Identifier("AudioDelay"),
-                 {std::make_unique<juce::AudioParameterFloat>("delay", "Delay Time", 0.0f, 2000.0f, 500.0f),
-                  std::make_unique<juce::AudioParameterFloat>("feedback", "Feedback", 0.0f, 0.95f, 0.5f),
-                  std::make_unique<juce::AudioParameterFloat>("mix", "Dry/Wet Mix", 0.0f, 1.0f, 0.5f)})
+    : AudioProcessor(BusesProperties()
+                         .withInput("Input", juce::AudioChannelSet::stereo(), true)
+                         .withOutput("Output", juce::AudioChannelSet::stereo(), true)),
+      parameters(*this, nullptr, "Parameters", {std::make_unique<juce::AudioParameterFloat>("delay", "Delay Time", 0.0f, 2000.0f, 500.0f), std::make_unique<juce::AudioParameterFloat>("feedback", "Feedback", 0.0f, 0.95f, 0.5f), std::make_unique<juce::AudioParameterFloat>("mix", "Dry/Wet Mix", 0.0f, 1.0f, 0.5f), std::make_unique<juce::AudioParameterFloat>("bitcrush", "Bitcrush", 1.0f, 16.0f, 16.0f)})
 {
-    delayTimeParameter = parameters.getRawParameterValue("delay");
-    feedbackParameter = parameters.getRawParameterValue("feedback");
-    mixParameter = parameters.getRawParameterValue("mix");
 }
 
 AudioDelayAudioProcessor::~AudioDelayAudioProcessor()
@@ -67,18 +63,32 @@ void AudioDelayAudioProcessor::changeProgramName(int index, const juce::String &
 
 void AudioDelayAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
-    const int numChannels = getTotalNumInputChannels();
-    const int delayBufferSize = 2 * (sampleRate + samplesPerBlock);
-    delayBuffer.setSize(numChannels, delayBufferSize);
-    delayBuffer.clear();
+    juce::dsp::ProcessSpec spec;
+    spec.sampleRate = sampleRate;
+    spec.maximumBlockSize = samplesPerBlock;
+    spec.numChannels = getTotalNumOutputChannels();
 
-    delayWritePosition = 0;
+    delayLine.reset();
+    delayLine.prepare(spec);
+    delayLine.setMaximumDelayInSamples(sampleRate * 2.0); // Max 2 seconds delay
+
+    dryWetMixer.prepare(spec);
+    dryWetMixer.reset();
 }
 
 void AudioDelayAudioProcessor::releaseResources()
 {
-    // When playback stops, you can use this as an opportunity to free up any
-    // spare memory, etc.
+}
+
+bool AudioDelayAudioProcessor::isBusesLayoutSupported(const BusesLayout &layouts) const
+{
+    if (layouts.getMainOutputChannelSet() != juce::AudioChannelSet::mono() && layouts.getMainOutputChannelSet() != juce::AudioChannelSet::stereo())
+        return false;
+
+    if (layouts.getMainOutputChannelSet() != layouts.getMainInputChannelSet())
+        return false;
+
+    return true;
 }
 
 void AudioDelayAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer, juce::MidiBuffer &midiMessages)
@@ -90,66 +100,64 @@ void AudioDelayAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer, ju
     for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
         buffer.clear(i, 0, buffer.getNumSamples());
 
-    const int bufferLength = buffer.getNumSamples();
-    const int delayBufferLength = delayBuffer.getNumSamples();
+    // Update parameters
+    float delayTime = *parameters.getRawParameterValue("delay");
+    float feedback = *parameters.getRawParameterValue("feedback");
+    float mix = *parameters.getRawParameterValue("mix");
+    float bitcrushAmount = *parameters.getRawParameterValue("bitcrush");
 
+    delayLine.setDelay(delayTime / 1000.0f * getSampleRate());
+    dryWetMixer.setWetMixProportion(mix);
+
+    // Create an audio block
+    juce::dsp::AudioBlock<float> block(buffer);
+
+    // Save the dry signal
+    dryWetMixer.pushDrySamples(block);
+
+    // Process delay and feedback
     for (int channel = 0; channel < totalNumInputChannels; ++channel)
     {
-        const float *bufferData = buffer.getReadPointer(channel);
-        const float *delayBufferData = delayBuffer.getReadPointer(channel);
-        float *dryBuffer = buffer.getWritePointer(channel);
+        auto *channelData = buffer.getWritePointer(channel);
 
-        fillDelayBuffer(channel, bufferLength, delayBufferLength, bufferData, delayBufferData);
-        getFromDelayBuffer(buffer, channel, bufferLength, delayBufferLength, bufferData, delayBufferData);
-
-        // Apply dry/wet mix
-        float mix = *mixParameter;
-        for (int sample = 0; sample < bufferLength; ++sample)
+        for (int sample = 0; sample < buffer.getNumSamples(); ++sample)
         {
-            float dry = bufferData[sample];
-            float wet = dryBuffer[sample];
-            dryBuffer[sample] = dry * (1.0f - mix) + wet * mix;
+            float inputSample = channelData[sample];
+            float delaySample = delayLine.popSample(channel);
+
+            float processedSample = delaySample;
+
+            // Apply feedback
+            delayLine.pushSample(channel, inputSample + (delaySample * feedback));
+
+            // Apply bitcrushing if needed
+            if (bitcrushAmount < 16.0f)
+            {
+                processedSample = applyBitcrushing(processedSample, bitcrushAmount);
+            }
+
+            channelData[sample] = processedSample;
         }
     }
 
-    delayWritePosition += bufferLength;
-    delayWritePosition %= delayBufferLength;
+    // Mix dry and wet signals
+    dryWetMixer.mixWetSamples(block);
 }
 
-void AudioDelayAudioProcessor::fillDelayBuffer(int channel, const int bufferLength, const int delayBufferLength, const float *bufferData, const float *delayBufferData)
+void AudioDelayAudioProcessor::updateDelayLineParameters()
 {
-    if (delayBufferLength > bufferLength + delayWritePosition)
-    {
-        delayBuffer.copyFromWithRamp(channel, delayWritePosition, bufferData, bufferLength, 0.8f, 0.8f);
-    }
-    else
-    {
-        const int bufferRemaining = delayBufferLength - delayWritePosition;
-        delayBuffer.copyFromWithRamp(channel, delayWritePosition, bufferData, bufferRemaining, 0.8f, 0.8f);
-        delayBuffer.copyFromWithRamp(channel, 0, bufferData + bufferRemaining, bufferLength - bufferRemaining, 0.8f, 0.8f);
-    }
+    float delayTime = *parameters.getRawParameterValue("delay");
+    delayLine.setDelay(delayTime / 1000.0f * getSampleRate());
+
+    float mix = *parameters.getRawParameterValue("mix");
+    dryWetMixer.setWetMixProportion(mix);
 }
 
-void AudioDelayAudioProcessor::getFromDelayBuffer(juce::AudioBuffer<float> &buffer, int channel, const int bufferLength, const int delayBufferLength, const float *bufferData, const float *delayBufferData)
+float AudioDelayAudioProcessor::applyBitcrushing(float sample, float bitcrushAmount)
 {
-    const float delayTime = *delayTimeParameter;
-    const float feedback = *feedbackParameter;
-
-    int delayTimeInSamples = static_cast<int>(delayTime * getSampleRate() / 1000);
-    int delayReadPosition = delayWritePosition - delayTimeInSamples;
-    if (delayReadPosition < 0)
-        delayReadPosition += delayBufferLength;
-
-    if (delayReadPosition + bufferLength < delayBufferLength)
-    {
-        buffer.addFromWithRamp(channel, 0, delayBufferData + delayReadPosition, bufferLength, feedback, feedback);
-    }
-    else
-    {
-        const int bufferRemaining = delayBufferLength - delayReadPosition;
-        buffer.addFromWithRamp(channel, 0, delayBufferData + delayReadPosition, bufferRemaining, feedback, feedback);
-        buffer.addFromWithRamp(channel, bufferRemaining, delayBufferData, bufferLength - bufferRemaining, feedback, feedback);
-    }
+    int bits = static_cast<int>(bitcrushAmount);
+    float maxValue = std::pow(2, bits) - 1;
+    return std::round(sample * maxValue) / maxValue;
 }
 
 bool AudioDelayAudioProcessor::hasEditor() const

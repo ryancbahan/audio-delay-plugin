@@ -1,6 +1,7 @@
 #pragma once
 
 #include <juce_audio_processors/juce_audio_processors.h>
+#include <juce_dsp/juce_dsp.h>
 
 class AudioDelayAudioProcessor : public juce::AudioProcessor
 {
@@ -10,6 +11,9 @@ public:
 
   void prepareToPlay(double sampleRate, int samplesPerBlock) override;
   void releaseResources() override;
+
+  bool isBusesLayoutSupported(const BusesLayout &layouts) const override;
+
   void processBlock(juce::AudioBuffer<float> &, juce::MidiBuffer &) override;
 
   juce::AudioProcessorEditor *createEditor() override;
@@ -31,19 +35,16 @@ public:
   void getStateInformation(juce::MemoryBlock &destData) override;
   void setStateInformation(const void *data, int sizeInBytes) override;
 
-  juce::AudioProcessorValueTreeState parameters;
+  juce::AudioProcessorValueTreeState &getParameters() { return parameters; }
 
 private:
-  juce::AudioBuffer<float> delayBuffer;
-  int delayBufferLength = 0;
-  int delayWritePosition = 0;
+  juce::AudioProcessorValueTreeState parameters;
 
-  std::atomic<float> *delayTimeParameter = nullptr;
-  std::atomic<float> *feedbackParameter = nullptr;
-  std::atomic<float> *mixParameter = nullptr;
+  juce::dsp::DelayLine<float, juce::dsp::DelayLineInterpolationTypes::Linear> delayLine;
+  juce::dsp::DryWetMixer<float> dryWetMixer;
 
-  void fillDelayBuffer(int channel, const int bufferLength, const int delayBufferLength, const float *bufferData, const float *delayBufferData);
-  void getFromDelayBuffer(juce::AudioBuffer<float> &buffer, int channel, const int bufferLength, const int delayBufferLength, const float *bufferData, const float *delayBufferData);
+  void updateDelayLineParameters();
+  float applyBitcrushing(float sample, float bitcrushAmount);
 
   JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AudioDelayAudioProcessor)
 };

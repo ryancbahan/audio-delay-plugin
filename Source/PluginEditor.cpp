@@ -4,49 +4,33 @@
 AudioDelayAudioProcessorEditor::AudioDelayAudioProcessorEditor(AudioDelayAudioProcessor &p)
     : AudioProcessorEditor(&p), audioProcessor(p)
 {
-  setSize(400, 400);
+  setSize(400, 300);
 
-  bitcrushSlider.setSliderStyle(juce::Slider::LinearHorizontal);
-  bitcrushSlider.setSliderStyle(juce::Slider::LinearHorizontal);
-  bitcrushSlider.setRange(0.0, 2000.0, 1.0);
-  bitcrushSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 100, 20);
-  addAndMakeVisible(&bitcrushSlider);
+  auto setupSlider = [this](juce::Slider &slider, juce::Label &label, const juce::String &labelText,
+                            double rangeStart, double rangeEnd, double interval)
+  {
+    addAndMakeVisible(slider);
+    slider.setRange(rangeStart, rangeEnd, interval);
+    slider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 100, 20);
 
-  delaySlider.setSliderStyle(juce::Slider::LinearHorizontal);
-  delaySlider.setRange(0.0, 2000.0, 1.0);
-  delaySlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 100, 20);
-  addAndMakeVisible(&delaySlider);
+    addAndMakeVisible(label);
+    label.setText(labelText, juce::dontSendNotification);
+    label.setJustificationType(juce::Justification::right);
+  };
 
-  feedbackSlider.setSliderStyle(juce::Slider::LinearHorizontal);
-  feedbackSlider.setRange(0.0, 0.95, 0.01);
-  feedbackSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 100, 20);
-  addAndMakeVisible(&feedbackSlider);
+  setupSlider(delaySlider, delayLabel, "Delay (ms)", 0.0, 2000.0, 1.0);
+  setupSlider(feedbackSlider, feedbackLabel, "Feedback", 0.0, 0.95, 0.01);
+  setupSlider(mixSlider, mixLabel, "Dry/Wet", 0.0, 1.0, 0.01);
+  setupSlider(bitcrushSlider, bitcrushLabel, "Bitcrush", 1.0, 16.0, 1.0);
 
-  mixSlider.setSliderStyle(juce::Slider::LinearHorizontal);
-  mixSlider.setRange(0.0, 1.0, 0.01);
-  mixSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 100, 20);
-  addAndMakeVisible(&mixSlider);
-
-  bitcrushLabel.setText("Bitcrush amount", juce::dontSendNotification);
-  bitcrushLabel.attachToComponent(&bitcrushSlider, true);
-  addAndMakeVisible(&bitcrushLabel);
-
-  delayLabel.setText("Delay Time (ms)", juce::dontSendNotification);
-  delayLabel.attachToComponent(&delaySlider, true);
-  addAndMakeVisible(&delayLabel);
-
-  feedbackLabel.setText("Feedback", juce::dontSendNotification);
-  feedbackLabel.attachToComponent(&feedbackSlider, true);
-  addAndMakeVisible(&feedbackLabel);
-
-  mixLabel.setText("Dry/Wet Mix", juce::dontSendNotification);
-  mixLabel.attachToComponent(&mixSlider, true);
-  addAndMakeVisible(&mixLabel);
-
-  delayAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(audioProcessor.parameters, "delay", delaySlider);
-  feedbackAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(audioProcessor.parameters, "feedback", feedbackSlider);
-  mixAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(audioProcessor.parameters, "mix", mixSlider);
-  bitcrushAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(audioProcessor.parameters, "bitcrush", bitcrushSlider);
+  delayAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
+      audioProcessor.getParameters(), "delay", delaySlider);
+  feedbackAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
+      audioProcessor.getParameters(), "feedback", feedbackSlider);
+  mixAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
+      audioProcessor.getParameters(), "mix", mixSlider);
+  bitcrushAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
+      audioProcessor.getParameters(), "bitcrush", bitcrushSlider);
 }
 
 AudioDelayAudioProcessorEditor::~AudioDelayAudioProcessorEditor()
@@ -61,9 +45,19 @@ void AudioDelayAudioProcessorEditor::paint(juce::Graphics &g)
 void AudioDelayAudioProcessorEditor::resized()
 {
   auto area = getLocalBounds();
+  int sliderHeight = 20;
+  int labelWidth = 100;
+  int margin = 10;
 
-  delaySlider.setBounds(area.removeFromTop(100).reduced(50, 25));
-  feedbackSlider.setBounds(area.removeFromTop(100).reduced(50, 25));
-  bitcrushSlider.setBounds(area.removeFromTop(100).reduced(50, 25));
-  mixSlider.setBounds(area.removeFromTop(100).reduced(50, 25));
+  auto setupSliderWithLabel = [&](juce::Slider &slider, juce::Label &label)
+  {
+    auto sliderArea = area.removeFromTop(sliderHeight + margin);
+    label.setBounds(sliderArea.removeFromLeft(labelWidth));
+    slider.setBounds(sliderArea.reduced(margin, 0));
+  };
+
+  setupSliderWithLabel(delaySlider, delayLabel);
+  setupSliderWithLabel(feedbackSlider, feedbackLabel);
+  setupSliderWithLabel(mixSlider, mixLabel);
+  setupSliderWithLabel(bitcrushSlider, bitcrushLabel);
 }
