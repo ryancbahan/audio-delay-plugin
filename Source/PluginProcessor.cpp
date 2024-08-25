@@ -5,7 +5,7 @@ AudioDelayAudioProcessor::AudioDelayAudioProcessor()
     : AudioProcessor(BusesProperties()
                          .withInput("Input", juce::AudioChannelSet::stereo(), true)
                          .withOutput("Output", juce::AudioChannelSet::stereo(), true)),
-      parameters(*this, nullptr, "Parameters", {std::make_unique<juce::AudioParameterFloat>("delay", "Delay Time", 0.0f, 2000.0f, 500.0f), std::make_unique<juce::AudioParameterFloat>("feedback", "Feedback", 0.0f, 0.95f, 0.5f), std::make_unique<juce::AudioParameterFloat>("mix", "Dry/Wet Mix", 0.0f, 1.0f, 0.5f), std::make_unique<juce::AudioParameterFloat>("bitcrush", "Bitcrush", 1.0f, 16.0f, 16.0f), std::make_unique<juce::AudioParameterFloat>("stereoWidth", "Stereo Width", 0.0f, 2.0f, 1.0f), std::make_unique<juce::AudioParameterFloat>("pan", "Pan", -1.0f, 1.0f, 0.0f)})
+      parameters(*this, nullptr, "Parameters", {std::make_unique<juce::AudioParameterFloat>("delay", "Delay Time", 0.0f, 2000.0f, 500.0f), std::make_unique<juce::AudioParameterFloat>("feedback", "Feedback", 0.0f, 0.95f, 0.5f), std::make_unique<juce::AudioParameterFloat>("mix", "Dry/Wet Mix", 0.0f, 1.0f, 0.5f), std::make_unique<juce::AudioParameterFloat>("bitcrush", "Bitcrush", 1.0f, 16.0f, 16.0f), std::make_unique<juce::AudioParameterFloat>("stereoWidth", "Stereo Width", 0.0f, 2.0f, 1.0f), std::make_unique<juce::AudioParameterFloat>("pan", "Pan", -1.0f, 1.0f, 0.0f), std::make_unique<juce::AudioParameterFloat>("reverbMix", "Reverb Mix", 0.0f, 1.0f, 0.0f)})
 {
 }
 
@@ -74,6 +74,18 @@ void AudioDelayAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBl
 
     dryWetMixer.prepare(spec);
     dryWetMixer.reset();
+
+    reverbMixer.prepare(spec);
+    reverbMixer.reset();
+
+    reverb.reset();
+    juce::Reverb::Parameters reverbParams;
+    reverbParams.roomSize = 0.5f;
+    reverbParams.damping = 0.5f;
+    reverbParams.wetLevel = 1.0f;
+    reverbParams.dryLevel = 0.0f;
+    reverbParams.width = 1.0f;
+    reverb.setParameters(reverbParams);
 }
 
 void AudioDelayAudioProcessor::releaseResources()
@@ -97,54 +109,67 @@ void AudioDelayAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer, ju
     auto totalNumInputChannels = getTotalNumInputChannels();
     auto totalNumOutputChannels = getTotalNumOutputChannels();
 
+    // Clear any unused output channels
     for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
         buffer.clear(i, 0, buffer.getNumSamples());
 
-    // Update parameters
+    // Get parameters
     float delayTime = *parameters.getRawParameterValue("delay");
     float feedback = *parameters.getRawParameterValue("feedback");
     float mix = *parameters.getRawParameterValue("mix");
     float bitcrushAmount = *parameters.getRawParameterValue("bitcrush");
     float stereoWidth = *parameters.getRawParameterValue("stereoWidth");
     float pan = *parameters.getRawParameterValue("pan");
+    float reverbMix = *parameters.getRawParameterValue("reverbMix");
 
     delayLine.setDelay(delayTime / 1000.0f * getSampleRate());
-    dryWetMixer.setWetMixProportion(mix);
-    panner.setPan(pan);
 
-    // Create an audio block
-    juce::dsp::AudioBlock<float> block(buffer);
+    // Create a copy of the input for the dry signal
+    juce::AudioBuffer<float> dryBuffer(buffer);
 
-    // Save the dry signal
-    dryWetMixer.pushDrySamples(block);
-
-    // Process delay and feedback
+    // Process delay and apply bitcrushing
+    juce::AudioBuffer<float> delayBuffer(totalNumInputChannels, buffer.getNumSamples());
     for (int channel = 0; channel < totalNumInputChannels; ++channel)
     {
-        auto *channelData = buffer.getWritePointer(channel);
+        auto *inputData = buffer.getReadPointer(channel);
+        auto *delayData = delayBuffer.getWritePointer(channel);
 
         for (int sample = 0; sample < buffer.getNumSamples(); ++sample)
         {
-            float inputSample = channelData[sample];
+            float inputSample = inputData[sample];
             float delaySample = delayLine.popSample(channel);
 
-            float processedSample = delaySample;
-
-            // Apply feedback
-            delayLine.pushSample(channel, inputSample + (delaySample * feedback));
-
-            // Apply bitcrushing if needed
+            // Apply bitcrushing to the delayed signal
             if (bitcrushAmount < 16.0f)
             {
-                processedSample = applyBitcrushing(processedSample, bitcrushAmount);
+                delaySample = applyBitcrushing(delaySample, bitcrushAmount);
             }
 
-            channelData[sample] = processedSample;
+            // Push the input + feedback into the delay line
+            delayLine.pushSample(channel, inputSample + (delaySample * feedback));
+
+            delayData[sample] = delaySample;
         }
     }
 
-    // Mix dry and wet signals
-    dryWetMixer.mixWetSamples(block);
+    // Process reverb
+    juce::AudioBuffer<float> reverbBuffer(delayBuffer);
+    reverb.processStereo(reverbBuffer.getWritePointer(0), reverbBuffer.getWritePointer(1), reverbBuffer.getNumSamples());
+
+    // Mix delay and reverb, then mix with dry signal
+    for (int channel = 0; channel < totalNumInputChannels; ++channel)
+    {
+        auto *delayData = delayBuffer.getReadPointer(channel);
+        auto *reverbData = reverbBuffer.getReadPointer(channel);
+        auto *outputData = buffer.getWritePointer(channel);
+        auto *dryData = dryBuffer.getReadPointer(channel);
+
+        for (int sample = 0; sample < buffer.getNumSamples(); ++sample)
+        {
+            float wetSample = delayData[sample] * (1 - reverbMix) + reverbData[sample] * reverbMix;
+            outputData[sample] = dryData[sample] * (1 - mix) + wetSample * mix;
+        }
+    }
 
     // Apply stereo width
     if (totalNumInputChannels == 2 && stereoWidth != 1.0f)
@@ -163,8 +188,19 @@ void AudioDelayAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer, ju
     }
 
     // Apply panning
+    juce::dsp::AudioBlock<float> block(buffer);
     juce::dsp::ProcessContextReplacing<float> context(block);
+    panner.setPan(pan);
     panner.process(context);
+
+    // Debug: Print the first sample of each channel
+    if (buffer.getNumSamples() > 0)
+    {
+        for (int channel = 0; channel < totalNumInputChannels; ++channel)
+        {
+            DBG("Channel " << channel << " first sample: " << buffer.getSample(channel, 0));
+        }
+    }
 }
 
 void AudioDelayAudioProcessor::updateDelayLineParameters()

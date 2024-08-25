@@ -22,6 +22,7 @@ private:
   juce::Slider bitcrushKnob;
   juce::Slider stereoWidthKnob;
   juce::Slider panKnob;
+  juce::Slider reverbKnob;
 
   juce::Label delayLabel;
   juce::Label feedbackLabel;
@@ -29,6 +30,7 @@ private:
   juce::Label bitcrushLabel;
   juce::Label stereoWidthLabel;
   juce::Label panLabel;
+  juce::Label reverbLabel;
 
   std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> delayAttachment;
   std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> feedbackAttachment;
@@ -36,6 +38,7 @@ private:
   std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> bitcrushAttachment;
   std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> stereoWidthAttachment;
   std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> panAttachment;
+  std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> reverbAttachment;
 
   JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AudioDelayAudioProcessorEditor)
 };

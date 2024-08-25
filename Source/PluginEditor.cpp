@@ -4,7 +4,7 @@
 AudioDelayAudioProcessorEditor::AudioDelayAudioProcessorEditor(AudioDelayAudioProcessor &p)
     : AudioProcessorEditor(&p), audioProcessor(p)
 {
-  setSize(600, 400); // Changed size
+  setSize(700, 400); // Increased width to accommodate the new knob
 
   auto setupKnob = [this](juce::Slider &knob, juce::Label &label, const juce::String &labelText,
                           double rangeStart, double rangeEnd, double interval)
@@ -25,6 +25,7 @@ AudioDelayAudioProcessorEditor::AudioDelayAudioProcessorEditor(AudioDelayAudioPr
   setupKnob(bitcrushKnob, bitcrushLabel, "Bitcrush", 1.0, 16.0, 1.0);
   setupKnob(stereoWidthKnob, stereoWidthLabel, "Stereo Width", 0.0, 2.0, 0.01);
   setupKnob(panKnob, panLabel, "Pan", -1.0, 1.0, 0.01);
+  setupKnob(reverbKnob, reverbLabel, "Reverb", 0.0, 1.0, 0.01);
 
   delayAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
       audioProcessor.getParameters(), "delay", delayKnob);
@@ -38,6 +39,8 @@ AudioDelayAudioProcessorEditor::AudioDelayAudioProcessorEditor(AudioDelayAudioPr
       audioProcessor.getParameters(), "stereoWidth", stereoWidthKnob);
   panAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
       audioProcessor.getParameters(), "pan", panKnob);
+  reverbAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
+      audioProcessor.getParameters(), "reverbMix", reverbKnob);
 }
 
 AudioDelayAudioProcessorEditor::~AudioDelayAudioProcessorEditor()
@@ -46,7 +49,7 @@ AudioDelayAudioProcessorEditor::~AudioDelayAudioProcessorEditor()
 
 void AudioDelayAudioProcessorEditor::paint(juce::Graphics &g)
 {
-  g.fillAll(juce::Colours::lightblue); // Changed background color
+  g.fillAll(juce::Colours::lightblue);
   g.setColour(juce::Colours::black);
   g.setFont(15.0f);
   g.drawFittedText("Audio Delay Plugin", getLocalBounds(), juce::Justification::centred, 1);
@@ -55,7 +58,7 @@ void AudioDelayAudioProcessorEditor::paint(juce::Graphics &g)
 void AudioDelayAudioProcessorEditor::resized()
 {
   auto area = getLocalBounds().reduced(20);
-  int width = area.getWidth() / 3;
+  int width = area.getWidth() / 4; // Changed from 3 to 4 to accommodate the new knob
   int height = area.getHeight() / 2;
 
   auto layoutKnob = [this, width, height](juce::Slider &knob, juce::Label &label, int row, int col)
@@ -69,7 +72,8 @@ void AudioDelayAudioProcessorEditor::resized()
   layoutKnob(delayKnob, delayLabel, 0, 0);
   layoutKnob(feedbackKnob, feedbackLabel, 0, 1);
   layoutKnob(mixKnob, mixLabel, 0, 2);
-  layoutKnob(bitcrushKnob, bitcrushLabel, 1, 0);
-  layoutKnob(stereoWidthKnob, stereoWidthLabel, 1, 1);
-  layoutKnob(panKnob, panLabel, 1, 2);
+  layoutKnob(bitcrushKnob, bitcrushLabel, 0, 3);
+  layoutKnob(stereoWidthKnob, stereoWidthLabel, 1, 0);
+  layoutKnob(panKnob, panLabel, 1, 1);
+  layoutKnob(reverbKnob, reverbLabel, 1, 2);
 }
