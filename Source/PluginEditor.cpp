@@ -4,33 +4,40 @@
 AudioDelayAudioProcessorEditor::AudioDelayAudioProcessorEditor(AudioDelayAudioProcessor &p)
     : AudioProcessorEditor(&p), audioProcessor(p)
 {
-  setSize(400, 300);
+  setSize(600, 400); // Changed size
 
-  auto setupSlider = [this](juce::Slider &slider, juce::Label &label, const juce::String &labelText,
-                            double rangeStart, double rangeEnd, double interval)
+  auto setupKnob = [this](juce::Slider &knob, juce::Label &label, const juce::String &labelText,
+                          double rangeStart, double rangeEnd, double interval)
   {
-    addAndMakeVisible(slider);
-    slider.setRange(rangeStart, rangeEnd, interval);
-    slider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 100, 20);
+    knob.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
+    knob.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 80, 20);
+    knob.setRange(rangeStart, rangeEnd, interval);
+    addAndMakeVisible(knob);
 
-    addAndMakeVisible(label);
     label.setText(labelText, juce::dontSendNotification);
-    label.setJustificationType(juce::Justification::right);
+    label.setJustificationType(juce::Justification::centred);
+    addAndMakeVisible(label);
   };
 
-  setupSlider(delaySlider, delayLabel, "Delay (ms)", 0.0, 2000.0, 1.0);
-  setupSlider(feedbackSlider, feedbackLabel, "Feedback", 0.0, 0.95, 0.01);
-  setupSlider(mixSlider, mixLabel, "Dry/Wet", 0.0, 1.0, 0.01);
-  setupSlider(bitcrushSlider, bitcrushLabel, "Bitcrush", 1.0, 16.0, 1.0);
+  setupKnob(delayKnob, delayLabel, "Delay", 0.0, 2000.0, 1.0);
+  setupKnob(feedbackKnob, feedbackLabel, "Feedback", 0.0, 0.95, 0.01);
+  setupKnob(mixKnob, mixLabel, "Dry/Wet", 0.0, 1.0, 0.01);
+  setupKnob(bitcrushKnob, bitcrushLabel, "Bitcrush", 1.0, 16.0, 1.0);
+  setupKnob(stereoWidthKnob, stereoWidthLabel, "Stereo Width", 0.0, 2.0, 0.01);
+  setupKnob(panKnob, panLabel, "Pan", -1.0, 1.0, 0.01);
 
   delayAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
-      audioProcessor.getParameters(), "delay", delaySlider);
+      audioProcessor.getParameters(), "delay", delayKnob);
   feedbackAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
-      audioProcessor.getParameters(), "feedback", feedbackSlider);
+      audioProcessor.getParameters(), "feedback", feedbackKnob);
   mixAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
-      audioProcessor.getParameters(), "mix", mixSlider);
+      audioProcessor.getParameters(), "mix", mixKnob);
   bitcrushAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
-      audioProcessor.getParameters(), "bitcrush", bitcrushSlider);
+      audioProcessor.getParameters(), "bitcrush", bitcrushKnob);
+  stereoWidthAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
+      audioProcessor.getParameters(), "stereoWidth", stereoWidthKnob);
+  panAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
+      audioProcessor.getParameters(), "pan", panKnob);
 }
 
 AudioDelayAudioProcessorEditor::~AudioDelayAudioProcessorEditor()
@@ -39,25 +46,30 @@ AudioDelayAudioProcessorEditor::~AudioDelayAudioProcessorEditor()
 
 void AudioDelayAudioProcessorEditor::paint(juce::Graphics &g)
 {
-  g.fillAll(getLookAndFeel().findColour(juce::ResizableWindow::backgroundColourId));
+  g.fillAll(juce::Colours::lightblue); // Changed background color
+  g.setColour(juce::Colours::black);
+  g.setFont(15.0f);
+  g.drawFittedText("Audio Delay Plugin", getLocalBounds(), juce::Justification::centred, 1);
 }
 
 void AudioDelayAudioProcessorEditor::resized()
 {
-  auto area = getLocalBounds();
-  int sliderHeight = 20;
-  int labelWidth = 100;
-  int margin = 10;
+  auto area = getLocalBounds().reduced(20);
+  int width = area.getWidth() / 3;
+  int height = area.getHeight() / 2;
 
-  auto setupSliderWithLabel = [&](juce::Slider &slider, juce::Label &label)
+  auto layoutKnob = [this, width, height](juce::Slider &knob, juce::Label &label, int row, int col)
   {
-    auto sliderArea = area.removeFromTop(sliderHeight + margin);
-    label.setBounds(sliderArea.removeFromLeft(labelWidth));
-    slider.setBounds(sliderArea.reduced(margin, 0));
+    int x = width * col;
+    int y = height * row;
+    knob.setBounds(x, y, width, height - 20);
+    label.setBounds(x, y + height - 20, width, 20);
   };
 
-  setupSliderWithLabel(delaySlider, delayLabel);
-  setupSliderWithLabel(feedbackSlider, feedbackLabel);
-  setupSliderWithLabel(mixSlider, mixLabel);
-  setupSliderWithLabel(bitcrushSlider, bitcrushLabel);
+  layoutKnob(delayKnob, delayLabel, 0, 0);
+  layoutKnob(feedbackKnob, feedbackLabel, 0, 1);
+  layoutKnob(mixKnob, mixLabel, 0, 2);
+  layoutKnob(bitcrushKnob, bitcrushLabel, 1, 0);
+  layoutKnob(stereoWidthKnob, stereoWidthLabel, 1, 1);
+  layoutKnob(panKnob, panLabel, 1, 2);
 }

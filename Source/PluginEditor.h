@@ -16,20 +16,26 @@ public:
 private:
   AudioDelayAudioProcessor &audioProcessor;
 
-  juce::Slider delaySlider;
-  juce::Slider feedbackSlider;
-  juce::Slider mixSlider;
-  juce::Slider bitcrushSlider;
+  juce::Slider delayKnob;
+  juce::Slider feedbackKnob;
+  juce::Slider mixKnob;
+  juce::Slider bitcrushKnob;
+  juce::Slider stereoWidthKnob;
+  juce::Slider panKnob;
 
   juce::Label delayLabel;
   juce::Label feedbackLabel;
   juce::Label mixLabel;
   juce::Label bitcrushLabel;
+  juce::Label stereoWidthLabel;
+  juce::Label panLabel;
 
   std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> delayAttachment;
   std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> feedbackAttachment;
   std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> mixAttachment;
   std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> bitcrushAttachment;
+  std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> stereoWidthAttachment;
+  std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> panAttachment;
 
   JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AudioDelayAudioProcessorEditor)
 };

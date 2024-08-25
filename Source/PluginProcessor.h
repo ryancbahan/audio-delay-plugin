@@ -42,6 +42,7 @@ private:
 
   juce::dsp::DelayLine<float, juce::dsp::DelayLineInterpolationTypes::Linear> delayLine;
   juce::dsp::DryWetMixer<float> dryWetMixer;
+  juce::dsp::Panner<float> panner;
 
   void updateDelayLineParameters();
   float applyBitcrushing(float sample, float bitcrushAmount);

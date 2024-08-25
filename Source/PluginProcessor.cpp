@@ -5,7 +5,7 @@ AudioDelayAudioProcessor::AudioDelayAudioProcessor()
     : AudioProcessor(BusesProperties()
                          .withInput("Input", juce::AudioChannelSet::stereo(), true)
                          .withOutput("Output", juce::AudioChannelSet::stereo(), true)),
-      parameters(*this, nullptr, "Parameters", {std::make_unique<juce::AudioParameterFloat>("delay", "Delay Time", 0.0f, 2000.0f, 500.0f), std::make_unique<juce::AudioParameterFloat>("feedback", "Feedback", 0.0f, 0.95f, 0.5f), std::make_unique<juce::AudioParameterFloat>("mix", "Dry/Wet Mix", 0.0f, 1.0f, 0.5f), std::make_unique<juce::AudioParameterFloat>("bitcrush", "Bitcrush", 1.0f, 16.0f, 16.0f)})
+      parameters(*this, nullptr, "Parameters", {std::make_unique<juce::AudioParameterFloat>("delay", "Delay Time", 0.0f, 2000.0f, 500.0f), std::make_unique<juce::AudioParameterFloat>("feedback", "Feedback", 0.0f, 0.95f, 0.5f), std::make_unique<juce::AudioParameterFloat>("mix", "Dry/Wet Mix", 0.0f, 1.0f, 0.5f), std::make_unique<juce::AudioParameterFloat>("bitcrush", "Bitcrush", 1.0f, 16.0f, 16.0f), std::make_unique<juce::AudioParameterFloat>("stereoWidth", "Stereo Width", 0.0f, 2.0f, 1.0f), std::make_unique<juce::AudioParameterFloat>("pan", "Pan", -1.0f, 1.0f, 0.0f)})
 {
 }
 
@@ -105,9 +105,12 @@ void AudioDelayAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer, ju
     float feedback = *parameters.getRawParameterValue("feedback");
     float mix = *parameters.getRawParameterValue("mix");
     float bitcrushAmount = *parameters.getRawParameterValue("bitcrush");
+    float stereoWidth = *parameters.getRawParameterValue("stereoWidth");
+    float pan = *parameters.getRawParameterValue("pan");
 
     delayLine.setDelay(delayTime / 1000.0f * getSampleRate());
     dryWetMixer.setWetMixProportion(mix);
+    panner.setPan(pan);
 
     // Create an audio block
     juce::dsp::AudioBlock<float> block(buffer);
@@ -142,6 +145,26 @@ void AudioDelayAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer, ju
 
     // Mix dry and wet signals
     dryWetMixer.mixWetSamples(block);
+
+    // Apply stereo width
+    if (totalNumInputChannels == 2 && stereoWidth != 1.0f)
+    {
+        float *left = buffer.getWritePointer(0);
+        float *right = buffer.getWritePointer(1);
+
+        for (int sample = 0; sample < buffer.getNumSamples(); ++sample)
+        {
+            float mid = (left[sample] + right[sample]) * 0.5f;
+            float side = (right[sample] - left[sample]) * 0.5f;
+
+            left[sample] = mid - side * stereoWidth;
+            right[sample] = mid + side * stereoWidth;
+        }
+    }
+
+    // Apply panning
+    juce::dsp::ProcessContextReplacing<float> context(block);
+    panner.process(context);
 }
 
 void AudioDelayAudioProcessor::updateDelayLineParameters()
