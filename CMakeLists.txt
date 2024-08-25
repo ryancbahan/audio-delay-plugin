@@ -16,6 +16,7 @@ FetchContent_MakeAvailable(JUCE)
 # Set C++ standard
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g")
 
 # Create the plugin target
 juce_add_plugin(AudioDelay

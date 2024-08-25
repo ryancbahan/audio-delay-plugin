@@ -3,7 +3,8 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_dsp/juce_dsp.h>
 
-class AudioDelayAudioProcessor : public juce::AudioProcessor
+class AudioDelayAudioProcessor : public juce::AudioProcessor,
+                                 public juce::AudioProcessorValueTreeState::Listener
 {
 public:
   AudioDelayAudioProcessor();
@@ -37,6 +38,13 @@ public:
 
   juce::AudioProcessorValueTreeState &getParameters() { return parameters; }
 
+  // Add this function to implement the Listener interface
+  void parameterChanged(const juce::String &parameterID, float newValue) override;
+
+  void loadAudioFile(const juce::File &file);
+  void startPlaying();
+  void stopPlaying();
+
 private:
   juce::AudioProcessorValueTreeState parameters;
 
@@ -46,8 +54,11 @@ private:
   juce::Reverb reverb;
   juce::dsp::DryWetMixer<float> reverbMixer;
 
+  juce::dsp::StateVariableTPTFilter<float> bandPassFilter;
+
   void updateDelayLineParameters();
   float applyBitcrushing(float sample, float bitcrushAmount);
+  void updateFilterParameters();
 
   JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AudioDelayAudioProcessor)
 };

@@ -25,6 +25,8 @@ private:
   juce::Slider stereoWidthKnob;
   juce::Slider panKnob;
   juce::Slider reverbKnob;
+  juce::Slider filterFreqKnob; // New filter frequency knob
+  juce::Slider filterQKnob;    // New filter Q knob
 
   juce::Label delayLabel;
   juce::Label feedbackLabel;
@@ -33,6 +35,8 @@ private:
   juce::Label stereoWidthLabel;
   juce::Label panLabel;
   juce::Label reverbLabel;
+  juce::Label filterFreqLabel; // New filter frequency label
+  juce::Label filterQLabel;    // New filter Q label
 
   std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> delayAttachment;
   std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> feedbackAttachment;
@@ -41,6 +45,8 @@ private:
   std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> stereoWidthAttachment;
   std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> panAttachment;
   std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> reverbAttachment;
+  std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> filterFreqAttachment; // New filter frequency attachment
+  std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> filterQAttachment;    // New filter Q attachment
 
   JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AudioDelayAudioProcessorEditor)
 };

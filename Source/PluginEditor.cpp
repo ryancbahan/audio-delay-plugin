@@ -29,6 +29,8 @@ AudioDelayAudioProcessorEditor::AudioDelayAudioProcessorEditor(AudioDelayAudioPr
   setupKnob(stereoWidthKnob, stereoWidthLabel, "Stereo Width", 0.0, 2.0, 0.01);
   setupKnob(panKnob, panLabel, "Pan", -1.0, 1.0, 0.01);
   setupKnob(reverbKnob, reverbLabel, "Reverb", 0.0, 1.0, 0.01);
+  setupKnob(filterFreqKnob, filterFreqLabel, "Filter Freq", 20.0, 20000.0, 0.01);
+  setupKnob(filterQKnob, filterQLabel, "Filter Q", 0.1, 10.0, 0.01);
 
   delayAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
       audioProcessor.getParameters(), "delay", delayKnob);
@@ -44,6 +46,10 @@ AudioDelayAudioProcessorEditor::AudioDelayAudioProcessorEditor(AudioDelayAudioPr
       audioProcessor.getParameters(), "pan", panKnob);
   reverbAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
       audioProcessor.getParameters(), "reverbMix", reverbKnob);
+  filterFreqAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
+      audioProcessor.getParameters(), "filterFreq", filterFreqKnob);
+  filterQAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
+      audioProcessor.getParameters(), "filterQ", filterQKnob);
 }
 
 AudioDelayAudioProcessorEditor::~AudioDelayAudioProcessorEditor()
@@ -60,7 +66,7 @@ void AudioDelayAudioProcessorEditor::paint(juce::Graphics &g)
 void AudioDelayAudioProcessorEditor::resized()
 {
   auto area = getLocalBounds().reduced(20);
-  int width = area.getWidth() / 4;
+  int width = area.getWidth() / 5;
   int height = area.getHeight() / 2;
 
   auto layoutKnob = [this, width, height](juce::Slider &knob, juce::Label &label, int row, int col)
@@ -75,9 +81,11 @@ void AudioDelayAudioProcessorEditor::resized()
   layoutKnob(feedbackKnob, feedbackLabel, 0, 1);
   layoutKnob(mixKnob, mixLabel, 0, 2);
   layoutKnob(bitcrushKnob, bitcrushLabel, 0, 3);
-  layoutKnob(stereoWidthKnob, stereoWidthLabel, 1, 0);
-  layoutKnob(panKnob, panLabel, 1, 1);
-  layoutKnob(reverbKnob, reverbLabel, 1, 2);
+  layoutKnob(stereoWidthKnob, stereoWidthLabel, 0, 4);
+  layoutKnob(panKnob, panLabel, 1, 0);
+  layoutKnob(reverbKnob, reverbLabel, 1, 1);
+  layoutKnob(filterFreqKnob, filterFreqLabel, 1, 2);
+  layoutKnob(filterQKnob, filterQLabel, 1, 3);
 }
 
 void AudioDelayAudioProcessorEditor::setAllLabelsBlack()
@@ -89,11 +97,13 @@ void AudioDelayAudioProcessorEditor::setAllLabelsBlack()
   stereoWidthLabel.setColour(juce::Label::textColourId, juce::Colours::black);
   panLabel.setColour(juce::Label::textColourId, juce::Colours::black);
   reverbLabel.setColour(juce::Label::textColourId, juce::Colours::black);
+  filterFreqLabel.setColour(juce::Label::textColourId, juce::Colours::black);
+  filterQLabel.setColour(juce::Label::textColourId, juce::Colours::black);
 }
 
 void AudioDelayAudioProcessorEditor::setAllKnobsBlack()
 {
-  juce::Slider *knobs[] = {&delayKnob, &feedbackKnob, &mixKnob, &bitcrushKnob, &stereoWidthKnob, &panKnob, &reverbKnob};
+  juce::Slider *knobs[] = {&delayKnob, &feedbackKnob, &mixKnob, &bitcrushKnob, &stereoWidthKnob, &panKnob, &reverbKnob, &filterFreqKnob, &filterQKnob};
 
   for (auto *knob : knobs)
   {
