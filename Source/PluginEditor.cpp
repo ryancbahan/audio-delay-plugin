@@ -4,12 +4,12 @@
 AudioDelayAudioProcessorEditor::AudioDelayAudioProcessorEditor(AudioDelayAudioProcessor &p)
     : AudioProcessorEditor(&p), audioProcessor(p)
 {
-  setSize(400, 300);
+  setSize(400, 400);
 
   bitcrushSlider.setSliderStyle(juce::Slider::LinearHorizontal);
-  delaySlider.setSliderStyle(juce::Slider::LinearHorizontal);
-  delaySlider.setRange(0.0, 2000.0, 1.0);
-  delaySlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 100, 20);
+  bitcrushSlider.setSliderStyle(juce::Slider::LinearHorizontal);
+  bitcrushSlider.setRange(0.0, 2000.0, 1.0);
+  bitcrushSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 100, 20);
   addAndMakeVisible(&bitcrushSlider);
 
   delaySlider.setSliderStyle(juce::Slider::LinearHorizontal);
@@ -27,6 +27,10 @@ AudioDelayAudioProcessorEditor::AudioDelayAudioProcessorEditor(AudioDelayAudioPr
   mixSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 100, 20);
   addAndMakeVisible(&mixSlider);
 
+  bitcrushLabel.setText("Bitcrush amount", juce::dontSendNotification);
+  bitcrushLabel.attachToComponent(&bitcrushSlider, true);
+  addAndMakeVisible(&bitcrushLabel);
+
   delayLabel.setText("Delay Time (ms)", juce::dontSendNotification);
   delayLabel.attachToComponent(&delaySlider, true);
   addAndMakeVisible(&delayLabel);
@@ -42,6 +46,7 @@ AudioDelayAudioProcessorEditor::AudioDelayAudioProcessorEditor(AudioDelayAudioPr
   delayAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(audioProcessor.parameters, "delay", delaySlider);
   feedbackAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(audioProcessor.parameters, "feedback", feedbackSlider);
   mixAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(audioProcessor.parameters, "mix", mixSlider);
+  bitcrushAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(audioProcessor.parameters, "bitcrush", bitcrushSlider);
 }
 
 AudioDelayAudioProcessorEditor::~AudioDelayAudioProcessorEditor()
@@ -59,5 +64,6 @@ void AudioDelayAudioProcessorEditor::resized()
 
   delaySlider.setBounds(area.removeFromTop(100).reduced(50, 25));
   feedbackSlider.setBounds(area.removeFromTop(100).reduced(50, 25));
-  mixSlider.setBounds(area.reduced(50, 25));
+  bitcrushSlider.setBounds(area.removeFromTop(100).reduced(50, 25));
+  mixSlider.setBounds(area.removeFromTop(100).reduced(50, 25));
 }

@@ -24,10 +24,12 @@ private:
   juce::Label delayLabel;
   juce::Label feedbackLabel;
   juce::Label mixLabel;
+  juce::Label bitcrushLabel;
 
   std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> delayAttachment;
   std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> feedbackAttachment;
   std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> mixAttachment;
+  std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> bitcrushAttachment;
 
   JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AudioDelayAudioProcessorEditor)
 };
