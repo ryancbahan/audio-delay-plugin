@@ -53,12 +53,19 @@ private:
   juce::dsp::Panner<float> panner;
   juce::Reverb reverb;
   juce::dsp::DryWetMixer<float> reverbMixer;
+  float applyLFOToPan(float basePan, float lfoAmount, float lfoValue);
 
   juce::dsp::StateVariableTPTFilter<float> bandPassFilter;
 
   void updateDelayLineParameters();
   float applyBitcrushing(float sample, float bitcrushAmount);
   void updateFilterParameters();
+
+  juce::dsp::Oscillator<float> lfo;
+  float lfoPhase = 0.0f;
+
+  void updateLFOParameters();
+  float applyLFO(float baseValue, float lfoAmount, float lfoValue, float minValue, float maxValue);
 
   JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AudioDelayAudioProcessor)
 };
