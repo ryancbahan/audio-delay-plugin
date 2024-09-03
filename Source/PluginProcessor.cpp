@@ -129,9 +129,10 @@ void AudioDelayAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer, ju
     float pan = *parameters.getRawParameterValue("pan");
     float lfoFreq = *parameters.getRawParameterValue("lfoFreq");
     float lfoAmount = *parameters.getRawParameterValue("lfoAmount");
+    float baseHighpassFreq = *parameters.getRawParameterValue("highpassFreq");
+    float baseLowpassFreq = *parameters.getRawParameterValue("lowpassFreq");
 
     delayLine.setDelay(delayTime / 1000.0f * getSampleRate());
-    updateFilterParameters();
 
     lfo.setFrequency(lfoFreq);
 
@@ -149,6 +150,24 @@ void AudioDelayAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer, ju
             float lfoValue = lfo.processSample(0.0f);
             float modifiedBitcrush = applyLFO(bitcrushAmount, lfoAmount, lfoValue, 1.0f, 16.0f);
 
+            // Enhance filter modulation
+            float highpassModDepth = juce::jmap(lfoAmount, 0.5f, 4.0f);
+            float lowpassModDepth = juce::jmap(lfoAmount, 0.5f, 2.0f);
+
+            float modifiedHighpassFreq = juce::jlimit(
+                20.0f,
+                5000.0f,
+                baseHighpassFreq * std::pow(2.0f, highpassModDepth * (lfoValue * 2.0f - 1.0f)));
+
+            float modifiedLowpassFreq = juce::jlimit(
+                200.0f,
+                20000.0f,
+                baseLowpassFreq * std::pow(2.0f, lowpassModDepth * (lfoValue * 2.0f - 1.0f)));
+
+            // Update filter coefficients for this sample
+            *highpassFilter.state = *juce::dsp::IIR::Coefficients<float>::makeHighPass(getSampleRate(), modifiedHighpassFreq);
+            *lowpassFilter.state = *juce::dsp::IIR::Coefficients<float>::makeLowPass(getSampleRate(), modifiedLowpassFreq);
+
             float inputSample = inputData[sample];
             float delaySample = delayLine.popSample(channel);
 
@@ -158,12 +177,15 @@ void AudioDelayAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer, ju
                 delaySample = applyBitcrushing(delaySample, modifiedBitcrush);
             }
 
+            // Apply DC blocking filter to the delayed sample
+            delaySample = dcBlocker[channel].processSample(delaySample);
+
             delayLine.pushSample(channel, inputSample + (delaySample * feedback));
             wetData[sample] = delaySample;
         }
     }
 
-    // Apply filters to the wet signal only
+    // Apply filters to the wet signal
     juce::dsp::AudioBlock<float> wetBlock(wetBuffer);
     juce::dsp::ProcessContextReplacing<float> wetContext(wetBlock);
     highpassFilter.process(wetContext);
@@ -205,11 +227,13 @@ void AudioDelayAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer, ju
         }
     }
 
-    if (buffer.getNumSamples() > 0)
+    // Final DC blocking on the output
+    for (int channel = 0; channel < totalNumOutputChannels; ++channel)
     {
-        for (int channel = 0; channel < totalNumInputChannels; ++channel)
+        auto *channelData = buffer.getWritePointer(channel);
+        for (int sample = 0; sample < buffer.getNumSamples(); ++sample)
         {
-            DBG("Channel " << channel << " first sample: " << buffer.getSample(channel, 0));
+            channelData[sample] = finalDCBlocker[channel].processSample(channelData[sample]);
         }
     }
 }

@@ -55,6 +55,9 @@ private:
   juce::dsp::ProcessorDuplicator<juce::dsp::IIR::Filter<float>, juce::dsp::IIR::Coefficients<float>> highpassFilter;
   juce::dsp::ProcessorDuplicator<juce::dsp::IIR::Filter<float>, juce::dsp::IIR::Coefficients<float>> lowpassFilter;
 
+  std::array<juce::dsp::IIR::Filter<float>, 2> dcBlocker;
+  std::array<juce::dsp::IIR::Filter<float>, 2> finalDCBlocker;
+
   void updateDelayLineParameters();
   void updateLFOParameters();
   void updateFilterParameters();
