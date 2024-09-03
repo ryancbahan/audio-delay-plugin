@@ -24,7 +24,6 @@ private:
   juce::Slider bitcrushKnob;
   juce::Slider stereoWidthKnob;
   juce::Slider panKnob;
-  juce::Slider reverbKnob;
   juce::Slider filterFreqKnob;
   juce::Slider filterQKnob;
   juce::Slider lfoFreqKnob;
@@ -36,7 +35,6 @@ private:
   juce::Label bitcrushLabel;
   juce::Label stereoWidthLabel;
   juce::Label panLabel;
-  juce::Label reverbLabel;
   juce::Label filterFreqLabel;
   juce::Label filterQLabel;
   juce::Label lfoFreqLabel;
@@ -48,7 +46,6 @@ private:
   std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> bitcrushAttachment;
   std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> stereoWidthAttachment;
   std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> panAttachment;
-  std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> reverbAttachment;
   std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> filterFreqAttachment;
   std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> filterQAttachment;
   std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> lfoFreqAttachment;

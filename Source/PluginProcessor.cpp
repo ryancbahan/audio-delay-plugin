@@ -140,7 +140,6 @@ void AudioDelayAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer, ju
     float bitcrushAmount = *parameters.getRawParameterValue("bitcrush");
     float stereoWidth = *parameters.getRawParameterValue("stereoWidth");
     float pan = *parameters.getRawParameterValue("pan");
-    float reverbMix = *parameters.getRawParameterValue("reverbMix");
     float lfoFreq = *parameters.getRawParameterValue("lfoFreq");
     float lfoAmount = *parameters.getRawParameterValue("lfoAmount");
 
@@ -188,20 +187,15 @@ void AudioDelayAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer, ju
 
     averageModifiedPan /= (totalNumInputChannels * buffer.getNumSamples());
 
-    juce::AudioBuffer<float> reverbBuffer(delayBuffer);
-    reverb.processStereo(reverbBuffer.getWritePointer(0), reverbBuffer.getWritePointer(1), reverbBuffer.getNumSamples());
-
     for (int channel = 0; channel < totalNumInputChannels; ++channel)
     {
         auto *delayData = delayBuffer.getReadPointer(channel);
-        auto *reverbData = reverbBuffer.getReadPointer(channel);
         auto *outputData = buffer.getWritePointer(channel);
         auto *dryData = dryBuffer.getReadPointer(channel);
 
         for (int sample = 0; sample < buffer.getNumSamples(); ++sample)
         {
-            float wetSample = delayData[sample] * (1 - reverbMix) + reverbData[sample] * reverbMix;
-            outputData[sample] = dryData[sample] * (1 - mix) + wetSample * mix;
+            outputData[sample] = dryData[sample] * (1 - mix) + delayData[sample] * mix;
         }
     }
 
