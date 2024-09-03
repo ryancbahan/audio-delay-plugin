@@ -53,10 +53,34 @@ AudioDelayAudioProcessorEditor::AudioDelayAudioProcessorEditor(AudioDelayAudioPr
       audioProcessor.getParameters(), "lfoFreq", lfoFreqKnob);
   lfoAmountAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
       audioProcessor.getParameters(), "lfoAmount", lfoAmountKnob);
+
+  tempoSyncBox.addItem("Free", 1);
+  tempoSyncBox.addItem("1/1", 2);
+  tempoSyncBox.addItem("1/2", 3);
+  tempoSyncBox.addItem("1/4", 4);
+  tempoSyncBox.addItem("1/8", 5);
+  tempoSyncBox.addItem("1/16", 6);
+  tempoSyncBox.addItem("1/32", 7);
+  addAndMakeVisible(tempoSyncBox);
+
+  tempoSyncAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(
+      audioProcessor.getParameters(), "tempoSync", tempoSyncBox);
+
+  updateDelayKnob();
 }
 
 AudioDelayAudioProcessorEditor::~AudioDelayAudioProcessorEditor()
 {
+}
+
+void AudioDelayAudioProcessorEditor::updateDelayKnob()
+{
+  auto *delayParam = audioProcessor.getParameters().getParameter("delay");
+  if (delayParam != nullptr)
+  {
+    float delayMs = delayParam->convertFrom0to1(delayParam->getValue());
+    delayKnob.setValue(delayMs, juce::dontSendNotification);
+  }
 }
 
 void AudioDelayAudioProcessorEditor::paint(juce::Graphics &g)
@@ -71,6 +95,9 @@ void AudioDelayAudioProcessorEditor::resized()
   auto area = getLocalBounds().reduced(20);
   int width = area.getWidth() / 5;
   int height = area.getHeight() / 2;
+
+  tempoSyncBox.setBounds(width * 0, height * 0, width, 20);
+  delayKnob.setBounds(width * 0, height * 0 + 20, width, height - 20);
 
   auto layoutKnob = [this, width, height](juce::Slider &knob, juce::Label &label, int row, int col)
   {

@@ -16,6 +16,8 @@ public:
   void setAllKnobsBlack();
 
 private:
+  void updateDelayKnob();
+
   AudioDelayAudioProcessor &audioProcessor;
 
   juce::Slider delayKnob;
@@ -28,6 +30,8 @@ private:
   juce::Slider lfoAmountKnob;
   juce::Slider highpassFreqKnob;
   juce::Slider lowpassFreqKnob;
+
+  juce::ComboBox tempoSyncBox;
 
   juce::Label highpassFreqLabel;
   juce::Label lowpassFreqLabel;
@@ -52,6 +56,7 @@ private:
   std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> panAttachment;
   std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> lfoFreqAttachment;
   std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> lfoAmountAttachment;
+  std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> tempoSyncAttachment;
 
   JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AudioDelayAudioProcessorEditor)
 };
