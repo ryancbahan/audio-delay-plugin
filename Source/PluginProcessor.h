@@ -47,24 +47,21 @@ public:
 
 private:
   juce::AudioProcessorValueTreeState parameters;
-
   juce::dsp::DelayLine<float, juce::dsp::DelayLineInterpolationTypes::Linear> delayLine;
   juce::dsp::DryWetMixer<float> dryWetMixer;
   juce::dsp::Panner<float> panner;
-  juce::Reverb reverb;
-  juce::dsp::DryWetMixer<float> reverbMixer;
-  float applyLFOToPan(float basePan, float lfoAmount, float lfoValue);
+  juce::dsp::Oscillator<float> lfo;
 
-  juce::dsp::StateVariableTPTFilter<float> bandPassFilter;
+  juce::dsp::ProcessorDuplicator<juce::dsp::IIR::Filter<float>, juce::dsp::IIR::Coefficients<float>> highpassFilter;
+  juce::dsp::ProcessorDuplicator<juce::dsp::IIR::Filter<float>, juce::dsp::IIR::Coefficients<float>> lowpassFilter;
 
   void updateDelayLineParameters();
-  float applyBitcrushing(float sample, float bitcrushAmount);
+  void updateLFOParameters();
   void updateFilterParameters();
 
-  juce::dsp::Oscillator<float> lfo;
+  float applyLFOToPan(float basePan, float lfoAmount, float lfoValue);
+  float applyBitcrushing(float sample, float bitcrushAmount);
   float lfoPhase = 0.0f;
-
-  void updateLFOParameters();
   float applyLFO(float baseValue, float lfoAmount, float lfoValue, float minValue, float maxValue);
 
   JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AudioDelayAudioProcessor)

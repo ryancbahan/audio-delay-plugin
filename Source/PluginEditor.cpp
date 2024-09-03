@@ -4,7 +4,7 @@
 AudioDelayAudioProcessorEditor::AudioDelayAudioProcessorEditor(AudioDelayAudioProcessor &p)
     : AudioProcessorEditor(&p), audioProcessor(p)
 {
-  setSize(800, 400); // Increased width to accommodate new knobs
+  setSize(700, 400);
 
   auto setupKnob = [this](juce::Slider &knob, juce::Label &label, const juce::String &labelText,
                           double rangeStart, double rangeEnd, double interval)
@@ -28,9 +28,8 @@ AudioDelayAudioProcessorEditor::AudioDelayAudioProcessorEditor(AudioDelayAudioPr
   setupKnob(bitcrushKnob, bitcrushLabel, "Bitcrush", 1.0, 16.0, 1.0);
   setupKnob(stereoWidthKnob, stereoWidthLabel, "Stereo Width", 0.0, 2.0, 0.01);
   setupKnob(panKnob, panLabel, "Pan", -1.0, 1.0, 0.01);
-  setupKnob(reverbKnob, reverbLabel, "Reverb", 0.0, 1.0, 0.01);
-  setupKnob(filterFreqKnob, filterFreqLabel, "Filter Freq", 20.0, 20000.0, 0.01);
-  setupKnob(filterQKnob, filterQLabel, "Filter Q", 0.1, 10.0, 0.01);
+  setupKnob(highpassFreqKnob, highpassFreqLabel, "Highpass", 0.0, 1000.0, 1.0);
+  setupKnob(lowpassFreqKnob, lowpassFreqLabel, "Lowpass", 2000.0, 20000.0, 1.0);
   setupKnob(lfoFreqKnob, lfoFreqLabel, "LFO Freq", 0.1, 10.0, 0.1);
   setupKnob(lfoAmountKnob, lfoAmountLabel, "LFO Amount", 0.0, 1.0, 0.01);
 
@@ -46,12 +45,10 @@ AudioDelayAudioProcessorEditor::AudioDelayAudioProcessorEditor(AudioDelayAudioPr
       audioProcessor.getParameters(), "stereoWidth", stereoWidthKnob);
   panAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
       audioProcessor.getParameters(), "pan", panKnob);
-  reverbAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
-      audioProcessor.getParameters(), "reverbMix", reverbKnob);
-  filterFreqAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
-      audioProcessor.getParameters(), "filterFreq", filterFreqKnob);
-  filterQAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
-      audioProcessor.getParameters(), "filterQ", filterQKnob);
+  highpassFreqAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
+      audioProcessor.getParameters(), "highpassFreq", highpassFreqKnob);
+  lowpassFreqAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
+      audioProcessor.getParameters(), "lowpassFreq", lowpassFreqKnob);
   lfoFreqAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
       audioProcessor.getParameters(), "lfoFreq", lfoFreqKnob);
   lfoAmountAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
@@ -72,7 +69,7 @@ void AudioDelayAudioProcessorEditor::paint(juce::Graphics &g)
 void AudioDelayAudioProcessorEditor::resized()
 {
   auto area = getLocalBounds().reduced(20);
-  int width = area.getWidth() / 6; // Changed from 5 to 6 to accommodate new knobs
+  int width = area.getWidth() / 5;
   int height = area.getHeight() / 2;
 
   auto layoutKnob = [this, width, height](juce::Slider &knob, juce::Label &label, int row, int col)
@@ -88,10 +85,9 @@ void AudioDelayAudioProcessorEditor::resized()
   layoutKnob(mixKnob, mixLabel, 0, 2);
   layoutKnob(bitcrushKnob, bitcrushLabel, 0, 3);
   layoutKnob(stereoWidthKnob, stereoWidthLabel, 0, 4);
-  layoutKnob(panKnob, panLabel, 0, 5);
-  layoutKnob(reverbKnob, reverbLabel, 1, 0);
-  layoutKnob(filterFreqKnob, filterFreqLabel, 1, 1);
-  layoutKnob(filterQKnob, filterQLabel, 1, 2);
+  layoutKnob(panKnob, panLabel, 1, 0);
+  layoutKnob(highpassFreqKnob, highpassFreqLabel, 1, 1);
+  layoutKnob(lowpassFreqKnob, lowpassFreqLabel, 1, 2);
   layoutKnob(lfoFreqKnob, lfoFreqLabel, 1, 3);
   layoutKnob(lfoAmountKnob, lfoAmountLabel, 1, 4);
 }
@@ -100,7 +96,7 @@ void AudioDelayAudioProcessorEditor::setAllLabelsBlack()
 {
   juce::Label *labels[] = {
       &delayLabel, &feedbackLabel, &mixLabel, &bitcrushLabel, &stereoWidthLabel,
-      &panLabel, &reverbLabel, &filterFreqLabel, &filterQLabel, &lfoFreqLabel, &lfoAmountLabel};
+      &panLabel, &highpassFreqLabel, &lowpassFreqLabel, &lfoFreqLabel, &lfoAmountLabel};
 
   for (auto *label : labels)
   {
@@ -112,7 +108,7 @@ void AudioDelayAudioProcessorEditor::setAllKnobsBlack()
 {
   juce::Slider *knobs[] = {
       &delayKnob, &feedbackKnob, &mixKnob, &bitcrushKnob, &stereoWidthKnob,
-      &panKnob, &reverbKnob, &filterFreqKnob, &filterQKnob, &lfoFreqKnob, &lfoAmountKnob};
+      &panKnob, &highpassFreqKnob, &lowpassFreqKnob, &lfoFreqKnob, &lfoAmountKnob};
 
   for (auto *knob : knobs)
   {
