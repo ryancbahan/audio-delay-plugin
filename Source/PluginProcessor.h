@@ -2,9 +2,11 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_dsp/juce_dsp.h>
+#include <juce_core/juce_core.h>
 
 class AudioDelayAudioProcessor : public juce::AudioProcessor,
-                                 public juce::AudioProcessorValueTreeState::Listener
+                                 public juce::AudioProcessorValueTreeState::Listener,
+                                 public juce::Timer
 {
 public:
   AudioDelayAudioProcessor();
@@ -30,6 +32,7 @@ public:
   void setStateInformation(const void *data, int sizeInBytes) override;
 
   void parameterChanged(const juce::String &parameterID, float newValue) override;
+  void timerCallback() override;
 
   juce::AudioProcessorValueTreeState &getParameters() { return parameters; }
 

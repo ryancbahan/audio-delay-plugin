@@ -16,6 +16,8 @@ public:
   void setAllKnobsBlack();
 
 private:
+  void updateDelayKnob();
+
   AudioDelayAudioProcessor &audioProcessor;
 
   juce::Slider delayKnob;

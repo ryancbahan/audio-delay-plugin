@@ -6,9 +6,12 @@ AudioDelayAudioProcessor::AudioDelayAudioProcessor()
                          .withInput("Input", juce::AudioChannelSet::stereo(), true)
                          .withOutput("Output", juce::AudioChannelSet::stereo(), true)),
       parameters(*this, nullptr, "Parameters", {std::make_unique<juce::AudioParameterFloat>("delay", "Delay Time", 0.0f, 2000.0f, 500.0f), std::make_unique<juce::AudioParameterFloat>("feedback", "Feedback", 0.0f, 0.95f, 0.5f), std::make_unique<juce::AudioParameterFloat>("mix", "Dry/Wet Mix", 0.0f, 1.0f, 0.5f), std::make_unique<juce::AudioParameterFloat>("bitcrush", "Bitcrush", 1.0f, 16.0f, 16.0f), std::make_unique<juce::AudioParameterFloat>("stereoWidth", "Stereo Width", 0.0f, 2.0f, 1.0f), std::make_unique<juce::AudioParameterFloat>("pan", "Pan", -1.0f, 1.0f, 0.0f), std::make_unique<juce::AudioParameterFloat>("highpassFreq", "Highpass Freq", 20.0f, 5000.0f, 20.0f), std::make_unique<juce::AudioParameterFloat>("lowpassFreq", "Lowpass Freq", 200.0f, 20000.0f, 20000.0f), std::make_unique<juce::AudioParameterFloat>("lfoFreq", "LFO Frequency", 0.1f, 10.0f, 1.0f), std::make_unique<juce::AudioParameterFloat>("lfoAmount", "LFO Amount", 0.0f, 1.0f, 0.0f), std::make_unique<juce::AudioParameterChoice>("tempoSync", "Tempo Sync", juce::StringArray{"Free", "1/1", "1/2", "1/4", "1/8", "1/16", "1/32"}, 0)}),
+      lastKnownBPM(120.0),
+      delayLine(44100 * 2),
       lfo([](float x)
-          { return std::sin(x); }) // Initialize LFO with a sine wave
+          { return std::sin(x); })
 {
+    DBG("AudioDelayAudioProcessor constructor called");
     delayParameter = parameters.getRawParameterValue("delay");
     feedbackParameter = parameters.getRawParameterValue("feedback");
     mixParameter = parameters.getRawParameterValue("mix");
@@ -27,6 +30,8 @@ AudioDelayAudioProcessor::AudioDelayAudioProcessor()
     // Initialize the LFO
     lfo.initialise([](float x)
                    { return std::sin(x); });
+
+    DBG("AudioDelayAudioProcessor constructor completed");
 }
 
 AudioDelayAudioProcessor::~AudioDelayAudioProcessor()
@@ -87,13 +92,19 @@ void AudioDelayAudioProcessor::changeProgramName(int index, const juce::String &
 
 void AudioDelayAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
+    DBG("prepareToPlay called with sampleRate: " << sampleRate << " and samplesPerBlock: " << samplesPerBlock);
+
     juce::dsp::ProcessSpec spec;
     spec.sampleRate = sampleRate;
     spec.maximumBlockSize = static_cast<juce::uint32>(samplesPerBlock);
     spec.numChannels = static_cast<juce::uint32>(getTotalNumOutputChannels());
 
+    int maxDelaySamples = static_cast<int>(sampleRate * 2.0); // Max 2 seconds delay
     delayLine.prepare(spec);
-    delayLine.setMaximumDelayInSamples(static_cast<int>(sampleRate * 2.0)); // Max 2 seconds delay
+    delayLine.setMaximumDelayInSamples(maxDelaySamples);
+
+    DBG("DelayLine prepared with maxDelaySamples: " << maxDelaySamples);
+    DBG("Maximum delay in milliseconds: " << (maxDelaySamples * 1000.0 / sampleRate));
 
     dryWetMixer.prepare(spec);
     panner.prepare(spec);
@@ -114,8 +125,17 @@ void AudioDelayAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBl
         filter.coefficients = juce::dsp::IIR::Coefficients<float>::makeHighPass(sampleRate, 5.0f);
     }
 
+    // Update the delay parameter range
+    if (auto *delayParam = dynamic_cast<juce::AudioParameterFloat *>(parameters.getParameter("delay")))
+    {
+        delayParam->range = juce::NormalisableRange<float>(0.0f, 2000.0f);
+        DBG("Delay parameter range updated: 0.0f to 2000.0f");
+    }
+
     updateDelayTimeFromSync();
     updateFilterParameters();
+
+    DBG("prepareToPlay completed");
 }
 
 void AudioDelayAudioProcessor::releaseResources()
@@ -135,6 +155,13 @@ bool AudioDelayAudioProcessor::isBusesLayoutSupported(const BusesLayout &layouts
 
 void AudioDelayAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer, juce::MidiBuffer &midiMessages)
 {
+    static bool firstCall = true;
+    if (firstCall)
+    {
+        DBG("First call to processBlock");
+        firstCall = false;
+    }
+
     juce::ScopedNoDenormals noDenormals;
     auto totalNumInputChannels = getTotalNumInputChannels();
     auto totalNumOutputChannels = getTotalNumOutputChannels();
@@ -148,7 +175,7 @@ void AudioDelayAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer, ju
             if (positionInfo->getBpm().hasValue())
             {
                 double currentBPM = *positionInfo->getBpm();
-                if (currentBPM != lastKnownBPM)
+                if (std::abs(currentBPM - lastKnownBPM) > 0.01) // Check for significant change
                 {
                     lastKnownBPM = currentBPM;
                     updateDelayTimeFromSync();
@@ -303,9 +330,12 @@ void AudioDelayAudioProcessor::setStateInformation(const void *data, int sizeInB
 
 void AudioDelayAudioProcessor::parameterChanged(const juce::String &parameterID, float newValue)
 {
+    DBG("Parameter changed: " << parameterID << " = " << newValue);
+
     if (parameterID == "tempoSync" || parameterID == "delay")
     {
-        updateDelayTimeFromSync();
+        // Use a timer to debounce rapid parameter changes
+        startTimerHz(30); // Will call timerCallback after ~33ms
     }
     else if (parameterID == "highpassFreq" || parameterID == "lowpassFreq")
     {
@@ -313,16 +343,30 @@ void AudioDelayAudioProcessor::parameterChanged(const juce::String &parameterID,
     }
 }
 
+void AudioDelayAudioProcessor::timerCallback()
+{
+    stopTimer();
+    updateDelayTimeFromSync();
+}
+
 void AudioDelayAudioProcessor::updateDelayTimeFromSync()
 {
-    float delayTime = *delayParameter;
-    int syncMode = static_cast<int>(*tempoSyncParameter);
+    static bool isUpdating = false;
+    if (isUpdating)
+        return;
+    isUpdating = true;
+    DBG("updateDelayTimeFromSync called");
+
+    float delayTime = delayParameter->load();
+    int syncMode = static_cast<int>(tempoSyncParameter->load());
+
+    DBG("Initial delay time: " << delayTime << ", Sync mode: " << syncMode << ", BPM: " << lastKnownBPM);
+
+    double beatsPerSecond = lastKnownBPM / 60.0;
+    double quarterNoteTime = 1000.0 / beatsPerSecond; // in milliseconds
 
     if (syncMode != TempoSync::Unsync)
     {
-        double beatsPerSecond = lastKnownBPM / 60.0;
-        double quarterNoteTime = 1000.0 / beatsPerSecond; // in milliseconds
-
         switch (syncMode)
         {
         case TempoSync::Whole:
@@ -346,10 +390,39 @@ void AudioDelayAudioProcessor::updateDelayTimeFromSync()
         }
     }
 
-    delayLine.setDelay(delayTime / 1000.0f * getSampleRate());
+    DBG("Calculated delay time: " << delayTime);
+
+    // Ensure the delay time is within the valid range
+    float maxDelayTime = 2000.0f; // 2 seconds maximum delay
+    delayTime = juce::jlimit(0.0f, maxDelayTime, delayTime);
+
+    float delayInSamples = delayTime / 1000.0f * getSampleRate();
+
+    // Ensure the delay in samples doesn't exceed the maximum
+    int maxDelaySamples = delayLine.getMaximumDelayInSamples();
+    DBG("Max delay samples from DelayLine: " << maxDelaySamples);
+    delayInSamples = juce::jlimit(1.0f, static_cast<float>(maxDelaySamples), delayInSamples);
+
+    DBG("Delay in samples: " << delayInSamples << " (Max: " << maxDelaySamples << ")");
+
+    delayLine.setDelay(delayInSamples);
 
     // Update the delay parameter to reflect the new delay time
-    *delayParameter = delayTime;
+    delayTime = (delayInSamples / getSampleRate()) * 1000.0f;
+    delayParameter->store(delayTime);
+
+    DBG("Final delay time: " << delayTime);
+
+    // Update the AudioProcessorValueTreeState parameter
+    if (auto *param = parameters.getParameter("delay"))
+    {
+        float normalizedValue = param->convertTo0to1(delayTime);
+        DBG("Normalized value: " << normalizedValue);
+        param->setValueNotifyingHost(normalizedValue);
+    }
+
+    DBG("updateDelayTimeFromSync completed");
+    isUpdating = false;
 }
 
 void AudioDelayAudioProcessor::updateFilterParameters()

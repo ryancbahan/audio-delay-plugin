@@ -65,10 +65,22 @@ AudioDelayAudioProcessorEditor::AudioDelayAudioProcessorEditor(AudioDelayAudioPr
 
   tempoSyncAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(
       audioProcessor.getParameters(), "tempoSync", tempoSyncBox);
+
+  updateDelayKnob();
 }
 
 AudioDelayAudioProcessorEditor::~AudioDelayAudioProcessorEditor()
 {
+}
+
+void AudioDelayAudioProcessorEditor::updateDelayKnob()
+{
+  auto *delayParam = audioProcessor.getParameters().getParameter("delay");
+  if (delayParam != nullptr)
+  {
+    float delayMs = delayParam->convertFrom0to1(delayParam->getValue());
+    delayKnob.setValue(delayMs, juce::dontSendNotification);
+  }
 }
 
 void AudioDelayAudioProcessorEditor::paint(juce::Graphics &g)
