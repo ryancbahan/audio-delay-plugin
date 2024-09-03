@@ -138,8 +138,7 @@ void AudioDelayAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer, ju
     juce::AudioBuffer<float> dryBuffer(buffer);
     juce::AudioBuffer<float> wetBuffer(totalNumInputChannels, buffer.getNumSamples());
 
-    float averageModifiedPan = 0.0f;
-
+    // Process delay and apply effects to wet signal only
     for (int channel = 0; channel < totalNumInputChannels; ++channel)
     {
         auto *inputData = buffer.getReadPointer(channel);
@@ -149,9 +148,6 @@ void AudioDelayAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer, ju
         {
             float lfoValue = lfo.processSample(0.0f);
             float modifiedBitcrush = applyLFO(bitcrushAmount, lfoAmount, lfoValue, 1.0f, 16.0f);
-            float modifiedPan = applyLFOToPan(pan, lfoAmount, lfoValue);
-
-            averageModifiedPan += modifiedPan;
 
             float inputSample = inputData[sample];
             float delaySample = delayLine.popSample(channel);
@@ -167,13 +163,34 @@ void AudioDelayAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer, ju
         }
     }
 
-    averageModifiedPan /= (totalNumInputChannels * buffer.getNumSamples());
-
     // Apply filters to the wet signal only
     juce::dsp::AudioBlock<float> wetBlock(wetBuffer);
     juce::dsp::ProcessContextReplacing<float> wetContext(wetBlock);
     highpassFilter.process(wetContext);
     lowpassFilter.process(wetContext);
+
+    // Apply stereo width to wet signal only
+    if (totalNumInputChannels == 2 && stereoWidth != 1.0f)
+    {
+        float *left = wetBuffer.getWritePointer(0);
+        float *right = wetBuffer.getWritePointer(1);
+
+        for (int sample = 0; sample < wetBuffer.getNumSamples(); ++sample)
+        {
+            float mid = (left[sample] + right[sample]) * 0.5f;
+            float side = (right[sample] - left[sample]) * 0.5f;
+
+            left[sample] = mid - side * stereoWidth;
+            right[sample] = mid + side * stereoWidth;
+        }
+    }
+
+    // Apply panning to wet signal only
+    float modifiedPan = applyLFOToPan(pan, lfoAmount, lfo.processSample(0.0f));
+    juce::dsp::AudioBlock<float> wetPanBlock(wetBuffer);
+    juce::dsp::ProcessContextReplacing<float> wetPanContext(wetPanBlock);
+    panner.setPan(modifiedPan);
+    panner.process(wetPanContext);
 
     // Mix dry and wet signals
     for (int channel = 0; channel < totalNumInputChannels; ++channel)
@@ -187,26 +204,6 @@ void AudioDelayAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer, ju
             outputData[sample] = dryData[sample] * (1 - mix) + wetData[sample] * mix;
         }
     }
-
-    if (totalNumInputChannels == 2 && stereoWidth != 1.0f)
-    {
-        float *left = buffer.getWritePointer(0);
-        float *right = buffer.getWritePointer(1);
-
-        for (int sample = 0; sample < buffer.getNumSamples(); ++sample)
-        {
-            float mid = (left[sample] + right[sample]) * 0.5f;
-            float side = (right[sample] - left[sample]) * 0.5f;
-
-            left[sample] = mid - side * stereoWidth;
-            right[sample] = mid + side * stereoWidth;
-        }
-    }
-
-    juce::dsp::AudioBlock<float> panBlock(buffer);
-    juce::dsp::ProcessContextReplacing<float> panContext(panBlock);
-    panner.setPan(averageModifiedPan);
-    panner.process(panContext);
 
     if (buffer.getNumSamples() > 0)
     {
