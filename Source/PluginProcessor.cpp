@@ -5,25 +5,24 @@ AudioDelayAudioProcessor::AudioDelayAudioProcessor()
     : AudioProcessor(BusesProperties()
                          .withInput("Input", juce::AudioChannelSet::stereo(), true)
                          .withOutput("Output", juce::AudioChannelSet::stereo(), true)),
-      parameters(*this, nullptr, "Parameters", {std::make_unique<juce::AudioParameterFloat>("delay", "Delay Time", 0.0f, 2000.0f, 500.0f), std::make_unique<juce::AudioParameterFloat>("feedback", "Feedback", 0.0f, 0.95f, 0.5f), std::make_unique<juce::AudioParameterFloat>("mix", "Dry/Wet Mix", 0.0f, 1.0f, 0.5f), std::make_unique<juce::AudioParameterFloat>("bitcrush", "Bitcrush", 1.0f, 16.0f, 16.0f), std::make_unique<juce::AudioParameterFloat>("stereoWidth", "Stereo Width", 0.0f, 2.0f, 1.0f), std::make_unique<juce::AudioParameterFloat>("pan", "Pan", -1.0f, 1.0f, 0.0f), std::make_unique<juce::AudioParameterFloat>("reverbMix", "Reverb Mix", 0.0f, 1.0f, 0.0f), std::make_unique<juce::AudioParameterFloat>("filterFreq", "Filter Frequency", 20.0f, 20000.0f, 1000.0f), std::make_unique<juce::AudioParameterFloat>("filterQ", "Filter Q", 0.1f, 10.0f, 1.0f), std::make_unique<juce::AudioParameterFloat>("lfoFreq", "LFO Frequency", 0.1f, 10.0f, 1.0f), std::make_unique<juce::AudioParameterFloat>("lfoAmount", "LFO Amount", 0.0f, 1.0f, 0.0f)})
+      parameters(*this, nullptr, "Parameters", {std::make_unique<juce::AudioParameterFloat>("delay", "Delay Time", 0.0f, 2000.0f, 500.0f), std::make_unique<juce::AudioParameterFloat>("feedback", "Feedback", 0.0f, 0.95f, 0.5f), std::make_unique<juce::AudioParameterFloat>("mix", "Dry/Wet Mix", 0.0f, 1.0f, 0.5f), std::make_unique<juce::AudioParameterFloat>("bitcrush", "Bitcrush", 1.0f, 16.0f, 16.0f), std::make_unique<juce::AudioParameterFloat>("stereoWidth", "Stereo Width", 0.0f, 2.0f, 1.0f), std::make_unique<juce::AudioParameterFloat>("pan", "Pan", -1.0f, 1.0f, 0.0f), std::make_unique<juce::AudioParameterFloat>("highpassFreq", "Highpass Freq", 0.0f, 1000.0f, 0.0f), std::make_unique<juce::AudioParameterFloat>("lowpassFreq", "Lowpass Freq", 2000.0f, 20000.0f, 20000.0f), std::make_unique<juce::AudioParameterFloat>("lfoFreq", "LFO Frequency", 0.1f, 10.0f, 1.0f), std::make_unique<juce::AudioParameterFloat>("lfoAmount", "LFO Amount", 0.0f, 1.0f, 0.0f)})
 {
-    parameters.addParameterListener("filterFreq", this);
-    parameters.addParameterListener("filterQ", this);
+    parameters.addParameterListener("highpassFreq", this);
+    parameters.addParameterListener("lowpassFreq", this);
     lfo.initialise([](float x)
                    { return std::sin(x); }, 128);
 }
 
 AudioDelayAudioProcessor::~AudioDelayAudioProcessor()
 {
-    parameters.removeParameterListener("filterFreq", this);
-    parameters.removeParameterListener("filterQ", this);
+    parameters.removeParameterListener("highpassFreq", this);
+    parameters.removeParameterListener("lowpassFreq", this);
 }
 
 void AudioDelayAudioProcessor::parameterChanged(const juce::String &parameterID, float newValue)
 {
-    if (parameterID == "filterFreq" || parameterID == "filterQ")
+    if (parameterID == "highpassFreq" || parameterID == "lowpassFreq")
     {
-        DBG(parameterID << " changed to " << newValue);
         updateFilterParameters();
     }
 }
@@ -90,21 +89,9 @@ void AudioDelayAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBl
     dryWetMixer.prepare(spec);
     dryWetMixer.reset();
 
-    reverbMixer.prepare(spec);
-    reverbMixer.reset();
+    highpassFilter.prepare(spec);
+    lowpassFilter.prepare(spec);
 
-    reverb.reset();
-    juce::Reverb::Parameters reverbParams;
-    reverbParams.roomSize = 0.5f;
-    reverbParams.damping = 0.5f;
-    reverbParams.wetLevel = 1.0f;
-    reverbParams.dryLevel = 0.0f;
-    reverbParams.width = 1.0f;
-    reverb.setParameters(reverbParams);
-
-    bandPassFilter.prepare(spec);
-    bandPassFilter.reset();
-    bandPassFilter.setType(juce::dsp::StateVariableTPTFilterType::bandpass);
     updateFilterParameters();
 
     lfo.prepare(spec);
@@ -149,14 +136,14 @@ void AudioDelayAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer, ju
     lfo.setFrequency(lfoFreq);
 
     juce::AudioBuffer<float> dryBuffer(buffer);
-    juce::AudioBuffer<float> delayBuffer(totalNumInputChannels, buffer.getNumSamples());
+    juce::AudioBuffer<float> wetBuffer(totalNumInputChannels, buffer.getNumSamples());
 
     float averageModifiedPan = 0.0f;
 
     for (int channel = 0; channel < totalNumInputChannels; ++channel)
     {
         auto *inputData = buffer.getReadPointer(channel);
-        auto *delayData = delayBuffer.getWritePointer(channel);
+        auto *wetData = wetBuffer.getWritePointer(channel);
 
         for (int sample = 0; sample < buffer.getNumSamples(); ++sample)
         {
@@ -168,34 +155,36 @@ void AudioDelayAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer, ju
 
             float inputSample = inputData[sample];
             float delaySample = delayLine.popSample(channel);
-            float filteredDelaySample = bandPassFilter.processSample(channel, delaySample);
 
-            if (sample < 5)
-            {
-                DBG("Channel " << channel << ", Sample " << sample << ": Before filter: " << delaySample << ", After filter: " << filteredDelaySample);
-            }
-
+            // Apply bitcrushing to the delayed signal
             if (modifiedBitcrush < 16.0f)
             {
-                filteredDelaySample = applyBitcrushing(filteredDelaySample, modifiedBitcrush);
+                delaySample = applyBitcrushing(delaySample, modifiedBitcrush);
             }
 
             delayLine.pushSample(channel, inputSample + (delaySample * feedback));
-            delayData[sample] = filteredDelaySample;
+            wetData[sample] = delaySample;
         }
     }
 
     averageModifiedPan /= (totalNumInputChannels * buffer.getNumSamples());
 
+    // Apply filters to the wet signal only
+    juce::dsp::AudioBlock<float> wetBlock(wetBuffer);
+    juce::dsp::ProcessContextReplacing<float> wetContext(wetBlock);
+    highpassFilter.process(wetContext);
+    lowpassFilter.process(wetContext);
+
+    // Mix dry and wet signals
     for (int channel = 0; channel < totalNumInputChannels; ++channel)
     {
-        auto *delayData = delayBuffer.getReadPointer(channel);
+        auto *wetData = wetBuffer.getReadPointer(channel);
         auto *outputData = buffer.getWritePointer(channel);
         auto *dryData = dryBuffer.getReadPointer(channel);
 
         for (int sample = 0; sample < buffer.getNumSamples(); ++sample)
         {
-            outputData[sample] = dryData[sample] * (1 - mix) + delayData[sample] * mix;
+            outputData[sample] = dryData[sample] * (1 - mix) + wetData[sample] * mix;
         }
     }
 
@@ -216,7 +205,7 @@ void AudioDelayAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer, ju
 
     juce::dsp::AudioBlock<float> panBlock(buffer);
     juce::dsp::ProcessContextReplacing<float> panContext(panBlock);
-    panner.setPan(averageModifiedPan); // Use the average modified pan value
+    panner.setPan(averageModifiedPan);
     panner.process(panContext);
 
     if (buffer.getNumSamples() > 0)
@@ -228,13 +217,14 @@ void AudioDelayAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer, ju
     }
 }
 
-void AudioDelayAudioProcessor::updateDelayLineParameters()
+void AudioDelayAudioProcessor::updateFilterParameters()
 {
-    float delayTime = *parameters.getRawParameterValue("delay");
-    delayLine.setDelay(delayTime / 1000.0f * getSampleRate());
+    auto sampleRate = getSampleRate();
+    float highpassFreq = *parameters.getRawParameterValue("highpassFreq");
+    float lowpassFreq = *parameters.getRawParameterValue("lowpassFreq");
 
-    float mix = *parameters.getRawParameterValue("mix");
-    dryWetMixer.setWetMixProportion(mix);
+    *highpassFilter.state = *juce::dsp::IIR::Coefficients<float>::makeHighPass(sampleRate, highpassFreq);
+    *lowpassFilter.state = *juce::dsp::IIR::Coefficients<float>::makeLowPass(sampleRate, lowpassFreq);
 }
 
 float AudioDelayAudioProcessor::applyBitcrushing(float sample, float bitcrushAmount)
@@ -242,16 +232,6 @@ float AudioDelayAudioProcessor::applyBitcrushing(float sample, float bitcrushAmo
     int bits = static_cast<int>(bitcrushAmount);
     float maxValue = std::pow(2, bits) - 1;
     return std::round(sample * maxValue) / maxValue;
-}
-
-void AudioDelayAudioProcessor::updateFilterParameters()
-{
-    float filterFreq = *parameters.getRawParameterValue("filterFreq");
-    float filterQ = *parameters.getRawParameterValue("filterQ");
-    bandPassFilter.setCutoffFrequency(filterFreq);
-    bandPassFilter.setResonance(filterQ);
-
-    DBG("Filter Frequency: " << filterFreq << " Hz, Q: " << filterQ);
 }
 
 float AudioDelayAudioProcessor::applyLFO(float baseValue, float lfoAmount, float lfoValue, float minValue, float maxValue)

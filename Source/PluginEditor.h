@@ -24,11 +24,13 @@ private:
   juce::Slider bitcrushKnob;
   juce::Slider stereoWidthKnob;
   juce::Slider panKnob;
-  juce::Slider filterFreqKnob;
-  juce::Slider filterQKnob;
   juce::Slider lfoFreqKnob;
   juce::Slider lfoAmountKnob;
+  juce::Slider highpassFreqKnob;
+  juce::Slider lowpassFreqKnob;
 
+  juce::Label highpassFreqLabel;
+  juce::Label lowpassFreqLabel;
   juce::Label delayLabel;
   juce::Label feedbackLabel;
   juce::Label mixLabel;
@@ -40,14 +42,14 @@ private:
   juce::Label lfoFreqLabel;
   juce::Label lfoAmountLabel;
 
+  std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> highpassFreqAttachment;
+  std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> lowpassFreqAttachment;
   std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> delayAttachment;
   std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> feedbackAttachment;
   std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> mixAttachment;
   std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> bitcrushAttachment;
   std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> stereoWidthAttachment;
   std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> panAttachment;
-  std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> filterFreqAttachment;
-  std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> filterQAttachment;
   std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> lfoFreqAttachment;
   std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> lfoAmountAttachment;
 
