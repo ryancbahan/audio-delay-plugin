@@ -46,7 +46,19 @@ public:
     Quarter,
     Eighth,
     Sixteenth,
-    ThirtySecond
+    ThirtySecond,
+    WholeTrip,
+    HalfTrip,
+    QuarterTrip,
+    EighthTrip,
+    SixteenthTrip,
+    ThirtySecondTrip,
+    WholeDot,
+    HalfDot,
+    QuarterDot,
+    EighthDot,
+    SixteenthDot,
+    ThirtySecondDot
   };
 
 private:
