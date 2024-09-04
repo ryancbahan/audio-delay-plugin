@@ -5,9 +5,9 @@ AudioDelayAudioProcessor::AudioDelayAudioProcessor()
     : AudioProcessor(BusesProperties()
                          .withInput("Input", juce::AudioChannelSet::stereo(), true)
                          .withOutput("Output", juce::AudioChannelSet::stereo(), true)),
-      parameters(*this, nullptr, "Parameters", {std::make_unique<juce::AudioParameterFloat>("delay", "Delay Time", 0.0f, 2000.0f, 500.0f), std::make_unique<juce::AudioParameterFloat>("feedback", "Feedback", 0.0f, 0.95f, 0.5f), std::make_unique<juce::AudioParameterFloat>("mix", "Dry/Wet Mix", 0.0f, 1.0f, 0.5f), std::make_unique<juce::AudioParameterFloat>("bitcrush", "Bitcrush", 1.0f, 16.0f, 16.0f), std::make_unique<juce::AudioParameterFloat>("stereoWidth", "Stereo Width", 0.0f, 2.0f, 1.0f), std::make_unique<juce::AudioParameterFloat>("pan", "Pan", -1.0f, 1.0f, 0.0f), std::make_unique<juce::AudioParameterFloat>("highpassFreq", "Highpass Freq", 20.0f, 5000.0f, 20.0f), std::make_unique<juce::AudioParameterFloat>("lowpassFreq", "Lowpass Freq", 200.0f, 20000.0f, 20000.0f), std::make_unique<juce::AudioParameterFloat>("lfoFreq", "LFO Frequency", 0.1f, 10.0f, 1.0f), std::make_unique<juce::AudioParameterFloat>("lfoAmount", "LFO Amount", 0.0f, 1.0f, 0.0f), std::make_unique<juce::AudioParameterChoice>("tempoSync", "Tempo Sync", juce::StringArray{"Free", "1/1", "1/2", "1/4", "1/8", "1/16", "1/32"}, 0)}),
+      parameters(*this, nullptr, "Parameters", {std::make_unique<juce::AudioParameterFloat>("delay", "Delay Time", 0.0f, 5000.0f, 500.0f), std::make_unique<juce::AudioParameterFloat>("feedback", "Feedback", 0.0f, 0.95f, 0.5f), std::make_unique<juce::AudioParameterFloat>("mix", "Dry/Wet Mix", 0.0f, 1.0f, 0.5f), std::make_unique<juce::AudioParameterFloat>("bitcrush", "Bitcrush", 1.0f, 16.0f, 16.0f), std::make_unique<juce::AudioParameterFloat>("stereoWidth", "Stereo Width", 0.0f, 2.0f, 1.0f), std::make_unique<juce::AudioParameterFloat>("pan", "Pan", -1.0f, 1.0f, 0.0f), std::make_unique<juce::AudioParameterFloat>("highpassFreq", "Highpass Freq", 20.0f, 5000.0f, 20.0f), std::make_unique<juce::AudioParameterFloat>("lowpassFreq", "Lowpass Freq", 200.0f, 20000.0f, 20000.0f), std::make_unique<juce::AudioParameterFloat>("lfoFreq", "LFO Frequency", 0.1f, 10.0f, 1.0f), std::make_unique<juce::AudioParameterFloat>("lfoAmount", "LFO Amount", 0.0f, 1.0f, 0.0f), std::make_unique<juce::AudioParameterChoice>("tempoSync", "Tempo Sync", juce::StringArray{"Free", "1/1", "1/2", "1/4", "1/8", "1/16", "1/32", "1/1T", "1/2T", "1/4T", "1/8T", "1/16D", "1/32D", "1/1D", "1/2D", "1/4D", "1/8D", "1/16D", "1/32D"}, 0)}),
       lastKnownBPM(120.0),
-      delayLine(44100 * 2),
+      delayLine(44100 * 5),
       lfo([](float x)
           { return std::sin(x); })
 {
@@ -99,7 +99,7 @@ void AudioDelayAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBl
     spec.maximumBlockSize = static_cast<juce::uint32>(samplesPerBlock);
     spec.numChannels = static_cast<juce::uint32>(getTotalNumOutputChannels());
 
-    int maxDelaySamples = static_cast<int>(sampleRate * 2.0); // Max 2 seconds delay
+    int maxDelaySamples = static_cast<int>(sampleRate * 5.0); // Max 5 seconds delay
     delayLine.prepare(spec);
     delayLine.setMaximumDelayInSamples(maxDelaySamples);
 
@@ -128,8 +128,8 @@ void AudioDelayAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBl
     // Update the delay parameter range
     if (auto *delayParam = dynamic_cast<juce::AudioParameterFloat *>(parameters.getParameter("delay")))
     {
-        delayParam->range = juce::NormalisableRange<float>(0.0f, 2000.0f);
-        DBG("Delay parameter range updated: 0.0f to 2000.0f");
+        delayParam->range = juce::NormalisableRange<float>(0.0f, 5000.0f);
+        DBG("Delay parameter range updated: 0.0f to 5000.0f");
     }
 
     updateDelayTimeFromSync();
@@ -387,13 +387,49 @@ void AudioDelayAudioProcessor::updateDelayTimeFromSync()
         case TempoSync::ThirtySecond:
             delayTime = static_cast<float>(quarterNoteTime / 8);
             break;
+        case TempoSync::WholeTrip:
+            delayTime = static_cast<float>(quarterNoteTime * 4 * 2 / 3);
+            break;
+        case TempoSync::HalfTrip:
+            delayTime = static_cast<float>(quarterNoteTime * 2 * 2 / 3);
+            break;
+        case TempoSync::QuarterTrip:
+            delayTime = static_cast<float>(quarterNoteTime * 2 / 3);
+            break;
+        case TempoSync::EighthTrip:
+            delayTime = static_cast<float>(quarterNoteTime / 2 * 2 / 3);
+            break;
+        case TempoSync::SixteenthTrip:
+            delayTime = static_cast<float>(quarterNoteTime / 4 * 2 / 3);
+            break;
+        case TempoSync::ThirtySecondTrip:
+            delayTime = static_cast<float>(quarterNoteTime / 8 * 2 / 3);
+            break;
+        case TempoSync::WholeDot:
+            delayTime = static_cast<float>(quarterNoteTime * 4 * 1.5);
+            break;
+        case TempoSync::HalfDot:
+            delayTime = static_cast<float>(quarterNoteTime * 2 * 1.5);
+            break;
+        case TempoSync::QuarterDot:
+            delayTime = static_cast<float>(quarterNoteTime * 1.5);
+            break;
+        case TempoSync::EighthDot:
+            delayTime = static_cast<float>(quarterNoteTime / 2 * 1.5);
+            break;
+        case TempoSync::SixteenthDot:
+            delayTime = static_cast<float>(quarterNoteTime / 4 * 1.5);
+            break;
+        case TempoSync::ThirtySecondDot:
+            delayTime = static_cast<float>(quarterNoteTime / 8 * 1.5);
+            break;
         }
     }
 
     DBG("Calculated delay time: " << delayTime);
 
     // Ensure the delay time is within the valid range
-    float maxDelayTime = 2000.0f; // 2 seconds maximum delay
+    float maxDelayTime = 5000.0f; // 5 seconds maximum delay
     delayTime = juce::jlimit(0.0f, maxDelayTime, delayTime);
 
     float delayInSamples = delayTime / 1000.0f * getSampleRate();

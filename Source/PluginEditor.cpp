@@ -22,7 +22,7 @@ AudioDelayAudioProcessorEditor::AudioDelayAudioProcessorEditor(AudioDelayAudioPr
     addAndMakeVisible(label);
   };
 
-  setupKnob(delayKnob, delayLabel, "Delay", 0.0, 2000.0, 1.0);
+  setupKnob(delayKnob, delayLabel, "Delay", 0.0, 5000.0, 1.0);
   setupKnob(feedbackKnob, feedbackLabel, "Feedback", 0.0, 0.95, 0.01);
   setupKnob(mixKnob, mixLabel, "Dry/Wet", 0.0, 1.0, 0.01);
   setupKnob(bitcrushKnob, bitcrushLabel, "Bitcrush", 1.0, 16.0, 1.0);
@@ -61,6 +61,18 @@ AudioDelayAudioProcessorEditor::AudioDelayAudioProcessorEditor(AudioDelayAudioPr
   tempoSyncBox.addItem("1/8", 5);
   tempoSyncBox.addItem("1/16", 6);
   tempoSyncBox.addItem("1/32", 7);
+  tempoSyncBox.addItem("1/1T", 8);
+  tempoSyncBox.addItem("1/2T", 9);
+  tempoSyncBox.addItem("1/4T", 10);
+  tempoSyncBox.addItem("1/8T", 11);
+  tempoSyncBox.addItem("1/16T", 12);
+  tempoSyncBox.addItem("1/32T", 13);
+  tempoSyncBox.addItem("1/1D", 14);
+  tempoSyncBox.addItem("1/2D", 15);
+  tempoSyncBox.addItem("1/4D", 16);
+  tempoSyncBox.addItem("1/8D", 17);
+  tempoSyncBox.addItem("1/16D", 18);
+  tempoSyncBox.addItem("1/32D", 19);
   addAndMakeVisible(tempoSyncBox);
 
   tempoSyncAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(
