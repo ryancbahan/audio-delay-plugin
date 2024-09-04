@@ -30,7 +30,7 @@ AudioDelayAudioProcessorEditor::AudioDelayAudioProcessorEditor(AudioDelayAudioPr
   setupKnob(panKnob, panLabel, "Pan", -1.0, 1.0, 0.01);
   setupKnob(highpassFreqKnob, highpassFreqLabel, "Highpass", 0.0, 1000.0, 1.0);
   setupKnob(lowpassFreqKnob, lowpassFreqLabel, "Lowpass", 2000.0, 20000.0, 1.0);
-  setupKnob(lfoFreqKnob, lfoFreqLabel, "LFO Freq", 0.1, 10.0, 0.1);
+  setupKnob(lfoFreqKnob, lfoFreqLabel, "LFO Freq", 0.1, 20.0, 0.1);
   setupKnob(lfoAmountKnob, lfoAmountLabel, "LFO Amount", 0.0, 1.0, 0.01);
 
   delayAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
