@@ -5,7 +5,7 @@ AudioDelayAudioProcessor::AudioDelayAudioProcessor()
     : AudioProcessor(BusesProperties()
                          .withInput("Input", juce::AudioChannelSet::stereo(), true)
                          .withOutput("Output", juce::AudioChannelSet::stereo(), true)),
-      parameters(*this, nullptr, "Parameters", {std::make_unique<juce::AudioParameterFloat>("delay", "Delay Time", 0.0f, 5000.0f, 500.0f), std::make_unique<juce::AudioParameterFloat>("feedback", "Feedback", 0.0f, 0.95f, 0.5f), std::make_unique<juce::AudioParameterFloat>("mix", "Dry/Wet Mix", 0.0f, 1.0f, 0.5f), std::make_unique<juce::AudioParameterFloat>("bitcrush", "Bitcrush", 1.0f, 16.0f, 16.0f), std::make_unique<juce::AudioParameterFloat>("stereoWidth", "Stereo Width", 0.0f, 2.0f, 1.0f), std::make_unique<juce::AudioParameterFloat>("pan", "Pan", -1.0f, 1.0f, 0.0f), std::make_unique<juce::AudioParameterFloat>("highpassFreq", "Highpass Freq", 20.0f, 5000.0f, 20.0f), std::make_unique<juce::AudioParameterFloat>("lowpassFreq", "Lowpass Freq", 200.0f, 20000.0f, 20000.0f), std::make_unique<juce::AudioParameterFloat>("lfoFreq", "LFO Frequency", 0.1f, 10.0f, 1.0f), std::make_unique<juce::AudioParameterFloat>("lfoAmount", "LFO Amount", 0.0f, 1.0f, 0.0f), std::make_unique<juce::AudioParameterChoice>("tempoSync", "Tempo Sync", juce::StringArray{"Free", "1/1", "1/2", "1/4", "1/8", "1/16", "1/32", "1/1T", "1/2T", "1/4T", "1/8T", "1/16D", "1/32D", "1/1D", "1/2D", "1/4D", "1/8D", "1/16D", "1/32D"}, 0)}),
+      parameters(*this, nullptr, "Parameters", {std::make_unique<juce::AudioParameterFloat>("delay", "Delay Time", 0.0f, 5000.0f, 500.0f), std::make_unique<juce::AudioParameterFloat>("feedback", "Feedback", 0.0f, 0.95f, 0.5f), std::make_unique<juce::AudioParameterFloat>("mix", "Dry/Wet Mix", 0.0f, 1.0f, 0.5f), std::make_unique<juce::AudioParameterFloat>("bitcrush", "Bitcrush", 1.0f, 16.0f, 16.0f), std::make_unique<juce::AudioParameterFloat>("stereoWidth", "Stereo Width", 0.0f, 2.0f, 1.0f), std::make_unique<juce::AudioParameterFloat>("pan", "Pan", -1.0f, 1.0f, 0.0f), std::make_unique<juce::AudioParameterFloat>("highpassFreq", "Highpass Freq", 20.0f, 5000.0f, 20.0f), std::make_unique<juce::AudioParameterFloat>("lowpassFreq", "Lowpass Freq", 200.0f, 20000.0f, 20000.0f), std::make_unique<juce::AudioParameterFloat>("lfoFreq", "LFO Frequency", 0.1f, 10.0f, 1.0f), std::make_unique<juce::AudioParameterFloat>("lfoAmount", "LFO Amount", 0.0f, 1.0f, 0.0f), std::make_unique<juce::AudioParameterChoice>("tempoSync", "Tempo Sync", juce::StringArray{"Free", "1/1", "1/2", "1/4", "1/8", "1/16", "1/32", "1/1T", "1/2T", "1/4T", "1/8T", "1/16T", "1/32T", "1/1D", "1/2D", "1/4D", "1/8D", "1/16D", "1/32D"}, 0), std::make_unique<juce::AudioParameterChoice>("lfoTempoSync", "LFO Tempo Sync", juce::StringArray{"Free", "1/1", "1/2", "1/4", "1/8", "1/16", "1/32", "1/1T", "1/2T", "1/4T", "1/8T", "1/16T", "1/32T", "1/1D", "1/2D", "1/4D", "1/8D", "1/16D", "1/32D"}, 0)}),
       lastKnownBPM(120.0),
       delayLine(44100 * 5),
       lfo([](float x)
@@ -27,6 +27,10 @@ AudioDelayAudioProcessor::AudioDelayAudioProcessor()
     parameters.addParameterListener("tempoSync", this);
     parameters.addParameterListener("delay", this);
 
+    lfoTempoSyncParameter = parameters.getRawParameterValue("lfoTempoSync");
+
+    parameters.addParameterListener("lfoTempoSync", this);
+
     // Initialize the LFO
     lfo.initialise([](float x)
                    { return std::sin(x); });
@@ -40,6 +44,7 @@ AudioDelayAudioProcessor::~AudioDelayAudioProcessor()
     parameters.removeParameterListener("delay", this);
     parameters.removeParameterListener("highpassFreq", this);
     parameters.removeParameterListener("lowpassFreq", this);
+    parameters.removeParameterListener("lfoTempoSync", this);
 }
 
 const juce::String AudioDelayAudioProcessor::getName() const
@@ -88,6 +93,92 @@ const juce::String AudioDelayAudioProcessor::getProgramName(int index)
 
 void AudioDelayAudioProcessor::changeProgramName(int index, const juce::String &newName)
 {
+}
+
+void AudioDelayAudioProcessor::updateLFOFrequencyFromSync()
+{
+    if (lfoTempoSyncParameter == nullptr)
+    {
+        DBG("lfoTempoSyncParameter is null");
+        return;
+    }
+
+    int syncMode = static_cast<int>(lfoTempoSyncParameter->load());
+    float lfoFreq = *lfoFreqParameter;
+
+    if (syncMode != TempoSync::Unsync)
+    {
+        double beatsPerSecond = lastKnownBPM / 60.0;
+        double quarterNoteTime = 1.0 / beatsPerSecond;
+
+        switch (syncMode)
+        {
+        case TempoSync::Whole:
+            lfoFreq = static_cast<float>(1.0 / (quarterNoteTime * 4));
+            break;
+        case TempoSync::Half:
+            lfoFreq = static_cast<float>(1.0 / (quarterNoteTime * 2));
+            break;
+        case TempoSync::Quarter:
+            lfoFreq = static_cast<float>(1.0 / quarterNoteTime);
+            break;
+        case TempoSync::Eighth:
+            lfoFreq = static_cast<float>(1.0 / (quarterNoteTime / 2));
+            break;
+        case TempoSync::Sixteenth:
+            lfoFreq = static_cast<float>(1.0 / (quarterNoteTime / 4));
+            break;
+        case TempoSync::ThirtySecond:
+            lfoFreq = static_cast<float>(1.0 / (quarterNoteTime / 8));
+            break;
+        case TempoSync::WholeTrip:
+            lfoFreq = static_cast<float>(1.0 / (quarterNoteTime * 4 * 2 / 3));
+            break;
+        case TempoSync::HalfTrip:
+            lfoFreq = static_cast<float>(1.0 / (quarterNoteTime * 2 * 2 / 3));
+            break;
+        case TempoSync::QuarterTrip:
+            lfoFreq = static_cast<float>(1.0 / (quarterNoteTime * 2 / 3));
+            break;
+        case TempoSync::EighthTrip:
+            lfoFreq = static_cast<float>(1.0 / (quarterNoteTime / 2 * 2 / 3));
+            break;
+        case TempoSync::SixteenthTrip:
+            lfoFreq = static_cast<float>(1.0 / (quarterNoteTime / 4 * 2 / 3));
+            break;
+        case TempoSync::ThirtySecondTrip:
+            lfoFreq = static_cast<float>(1.0 / (quarterNoteTime / 8 * 2 / 3));
+            break;
+        case TempoSync::WholeDot:
+            lfoFreq = static_cast<float>(1.0 / (quarterNoteTime * 4 * 1.5));
+            break;
+        case TempoSync::HalfDot:
+            lfoFreq = static_cast<float>(1.0 / (quarterNoteTime * 2 * 1.5));
+            break;
+        case TempoSync::QuarterDot:
+            lfoFreq = static_cast<float>(1.0 / (quarterNoteTime * 1.5));
+            break;
+        case TempoSync::EighthDot:
+            lfoFreq = static_cast<float>(1.0 / (quarterNoteTime / 2 * 1.5));
+            break;
+        case TempoSync::SixteenthDot:
+            lfoFreq = static_cast<float>(1.0 / (quarterNoteTime / 4 * 1.5));
+            break;
+        case TempoSync::ThirtySecondDot:
+            lfoFreq = static_cast<float>(1.0 / (quarterNoteTime / 8 * 1.5));
+            break;
+        }
+    }
+
+    lfoFreq = juce::jlimit(0.1f, 10.0f, lfoFreq);
+    lfo.setFrequency(lfoFreq);
+
+    // Update the AudioProcessorValueTreeState parameter
+    if (auto *param = parameters.getParameter("lfoFreq"))
+    {
+        float normalizedValue = param->convertTo0to1(lfoFreq);
+        param->setValueNotifyingHost(normalizedValue);
+    }
 }
 
 void AudioDelayAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
@@ -175,10 +266,11 @@ void AudioDelayAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer, ju
             if (positionInfo->getBpm().hasValue())
             {
                 double currentBPM = *positionInfo->getBpm();
-                if (std::abs(currentBPM - lastKnownBPM) > 0.01) // Check for significant change
+                if (std::abs(currentBPM - lastKnownBPM) > 0.01)
                 {
                     lastKnownBPM = currentBPM;
                     updateDelayTimeFromSync();
+                    updateLFOFrequencyFromSync();
                 }
             }
         }
@@ -332,10 +424,9 @@ void AudioDelayAudioProcessor::parameterChanged(const juce::String &parameterID,
 {
     DBG("Parameter changed: " << parameterID << " = " << newValue);
 
-    if (parameterID == "tempoSync" || parameterID == "delay")
+    if (parameterID == "tempoSync" || parameterID == "delay" || parameterID == "lfoTempoSync" || parameterID == "lfoFreq")
     {
-        // Use a timer to debounce rapid parameter changes
-        startTimerHz(30); // Will call timerCallback after ~33ms
+        startTimerHz(30);
     }
     else if (parameterID == "highpassFreq" || parameterID == "lowpassFreq")
     {
@@ -346,6 +437,7 @@ void AudioDelayAudioProcessor::parameterChanged(const juce::String &parameterID,
 void AudioDelayAudioProcessor::timerCallback()
 {
     stopTimer();
+    updateLFOFrequencyFromSync();
     updateDelayTimeFromSync();
 }
 

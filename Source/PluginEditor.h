@@ -32,6 +32,8 @@ private:
   juce::Slider lowpassFreqKnob;
 
   juce::ComboBox tempoSyncBox;
+  juce::ComboBox lfoTempoSyncBox;
+  juce::Label lfoTempoSyncLabel;
 
   juce::Label highpassFreqLabel;
   juce::Label lowpassFreqLabel;
@@ -46,6 +48,7 @@ private:
   juce::Label lfoFreqLabel;
   juce::Label lfoAmountLabel;
 
+  std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> lfoTempoSyncAttachment;
   std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> highpassFreqAttachment;
   std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> lowpassFreqAttachment;
   std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> delayAttachment;

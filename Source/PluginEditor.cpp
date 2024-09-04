@@ -75,6 +75,35 @@ AudioDelayAudioProcessorEditor::AudioDelayAudioProcessorEditor(AudioDelayAudioPr
   tempoSyncBox.addItem("1/32D", 19);
   addAndMakeVisible(tempoSyncBox);
 
+  lfoTempoSyncBox.addItem("Free", 1);
+  lfoTempoSyncBox.addItem("1/1", 2);
+  lfoTempoSyncBox.addItem("1/2", 3);
+  lfoTempoSyncBox.addItem("1/4", 4);
+  lfoTempoSyncBox.addItem("1/8", 5);
+  lfoTempoSyncBox.addItem("1/16", 6);
+  lfoTempoSyncBox.addItem("1/32", 7);
+  lfoTempoSyncBox.addItem("1/1T", 8);
+  lfoTempoSyncBox.addItem("1/2T", 9);
+  lfoTempoSyncBox.addItem("1/4T", 10);
+  lfoTempoSyncBox.addItem("1/8T", 11);
+  lfoTempoSyncBox.addItem("1/16T", 12);
+  lfoTempoSyncBox.addItem("1/32T", 13);
+  lfoTempoSyncBox.addItem("1/1D", 14);
+  lfoTempoSyncBox.addItem("1/2D", 15);
+  lfoTempoSyncBox.addItem("1/4D", 16);
+  lfoTempoSyncBox.addItem("1/8D", 17);
+  lfoTempoSyncBox.addItem("1/16D", 18);
+  lfoTempoSyncBox.addItem("1/32D", 19);
+  addAndMakeVisible(lfoTempoSyncBox);
+
+  lfoTempoSyncLabel.setText("LFO Sync", juce::dontSendNotification);
+  lfoTempoSyncLabel.setJustificationType(juce::Justification::centred);
+  lfoTempoSyncLabel.setColour(juce::Label::textColourId, juce::Colours::black);
+  addAndMakeVisible(lfoTempoSyncLabel);
+
+  lfoTempoSyncAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(
+      audioProcessor.getParameters(), "lfoTempoSync", lfoTempoSyncBox);
+
   tempoSyncAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(
       audioProcessor.getParameters(), "tempoSync", tempoSyncBox);
 
@@ -110,6 +139,14 @@ void AudioDelayAudioProcessorEditor::resized()
 
   tempoSyncBox.setBounds(width * 0, height * 0, width, 20);
   delayKnob.setBounds(width * 0, height * 0 + 20, width, height - 20);
+
+  // Add LFO Tempo Sync ComboBox layout
+  lfoTempoSyncBox.setBounds(width * 3, height * 1, width, 20);
+  lfoTempoSyncLabel.setBounds(width * 3, height * 1 + 20, width, 20);
+
+  // Adjust LFO Freq and Amount knob positions
+  lfoFreqKnob.setBounds(width * 3, height * 1 + 40, width, height - 60);
+  lfoAmountKnob.setBounds(width * 4, height * 1, width, height - 20);
 
   auto layoutKnob = [this, width, height](juce::Slider &knob, juce::Label &label, int row, int col)
   {

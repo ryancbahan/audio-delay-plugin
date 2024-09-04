@@ -86,6 +86,10 @@ private:
   std::atomic<float> *lfoAmountParameter = nullptr;
   std::atomic<float> *tempoSyncParameter = nullptr;
 
+  std::atomic<float> *lfoTempoSyncParameter = nullptr;
+
+  void updateLFOFrequencyFromSync();
+
   double lastKnownBPM = 120.0;
 
   void updateFilterParameters();
