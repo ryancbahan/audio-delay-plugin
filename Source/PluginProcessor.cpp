@@ -5,7 +5,7 @@ AudioDelayAudioProcessor::AudioDelayAudioProcessor()
     : AudioProcessor(BusesProperties()
                          .withInput("Input", juce::AudioChannelSet::stereo(), true)
                          .withOutput("Output", juce::AudioChannelSet::stereo(), true)),
-      parameters(*this, nullptr, "Parameters", {std::make_unique<juce::AudioParameterFloat>("delay", "Delay Time", 0.0f, 5000.0f, 500.0f), std::make_unique<juce::AudioParameterFloat>("feedback", "Feedback", 0.0f, 0.95f, 0.5f), std::make_unique<juce::AudioParameterFloat>("mix", "Dry/Wet Mix", 0.0f, 1.0f, 0.5f), std::make_unique<juce::AudioParameterFloat>("bitcrush", "Bitcrush", 1.0f, 16.0f, 16.0f), std::make_unique<juce::AudioParameterFloat>("stereoWidth", "Stereo Width", 0.0f, 2.0f, 1.0f), std::make_unique<juce::AudioParameterFloat>("pan", "Pan", -1.0f, 1.0f, 0.0f), std::make_unique<juce::AudioParameterFloat>("highpassFreq", "Highpass Freq", 20.0f, 5000.0f, 20.0f), std::make_unique<juce::AudioParameterFloat>("lowpassFreq", "Lowpass Freq", 200.0f, 20000.0f, 20000.0f), std::make_unique<juce::AudioParameterFloat>("lfoFreq", "LFO Frequency", 0.01f, 20.0f, 1.0f), std::make_unique<juce::AudioParameterFloat>("lfoAmount", "LFO Amount", 0.0f, 1.0f, 0.0f), std::make_unique<juce::AudioParameterChoice>("tempoSync", "Tempo Sync", juce::StringArray{"Free", "1/1", "1/2", "1/4", "1/8", "1/16", "1/32", "1/1T", "1/2T", "1/4T", "1/8T", "1/16T", "1/32T", "1/1D", "1/2D", "1/4D", "1/8D", "1/16D", "1/32D"}, 0), std::make_unique<juce::AudioParameterChoice>("lfoTempoSync", "LFO Tempo Sync", juce::StringArray{"Free", "1/1", "1/2", "1/4", "1/8", "1/16", "1/32", "1/1T", "1/2T", "1/4T", "1/8T", "1/16T", "1/32T", "1/1D", "1/2D", "1/4D", "1/8D", "1/16D", "1/32D"}, 0)}),
+      parameters(*this, nullptr, "Parameters", {std::make_unique<juce::AudioParameterFloat>("lfoBitcrush", "LFO Bitcrush", 0.0f, 1.0f, 0.0f), std::make_unique<juce::AudioParameterFloat>("lfoHighpass", "LFO Highpass", 0.0f, 1.0f, 0.0f), std::make_unique<juce::AudioParameterFloat>("lfoLowpass", "LFO Lowpass", 0.0f, 1.0f, 0.0f), std::make_unique<juce::AudioParameterFloat>("lfoPan", "LFO Pan", 0.0f, 1.0f, 0.0f), std::make_unique<juce::AudioParameterFloat>("delay", "Delay Time", 0.0f, 5000.0f, 500.0f), std::make_unique<juce::AudioParameterFloat>("feedback", "Feedback", 0.0f, 0.95f, 0.5f), std::make_unique<juce::AudioParameterFloat>("mix", "Dry/Wet Mix", 0.0f, 1.0f, 0.5f), std::make_unique<juce::AudioParameterFloat>("bitcrush", "Bitcrush", 1.0f, 16.0f, 16.0f), std::make_unique<juce::AudioParameterFloat>("stereoWidth", "Stereo Width", 0.0f, 2.0f, 1.0f), std::make_unique<juce::AudioParameterFloat>("pan", "Pan", -1.0f, 1.0f, 0.0f), std::make_unique<juce::AudioParameterFloat>("highpassFreq", "Highpass Freq", 20.0f, 5000.0f, 20.0f), std::make_unique<juce::AudioParameterFloat>("lowpassFreq", "Lowpass Freq", 200.0f, 20000.0f, 20000.0f), std::make_unique<juce::AudioParameterFloat>("lfoFreq", "LFO Frequency", 0.01f, 20.0f, 1.0f), std::make_unique<juce::AudioParameterFloat>("lfoAmount", "LFO Amount", 0.0f, 1.0f, 0.0f), std::make_unique<juce::AudioParameterChoice>("tempoSync", "Tempo Sync", juce::StringArray{"Free", "1/1", "1/2", "1/4", "1/8", "1/16", "1/32", "1/1T", "1/2T", "1/4T", "1/8T", "1/16T", "1/32T", "1/1D", "1/2D", "1/4D", "1/8D", "1/16D", "1/32D"}, 0), std::make_unique<juce::AudioParameterChoice>("lfoTempoSync", "LFO Tempo Sync", juce::StringArray{"Free", "1/1", "1/2", "1/4", "1/8", "1/16", "1/32", "1/1T", "1/2T", "1/4T", "1/8T", "1/16T", "1/32T", "1/1D", "1/2D", "1/4D", "1/8D", "1/16D", "1/32D"}, 0), std::make_unique<juce::AudioParameterFloat>("lfoBitcrush", "LFO Bitcrush", 0.0f, 1.0f, 0.0f), std::make_unique<juce::AudioParameterFloat>("lfoHighpass", "LFO Highpass", 0.0f, 1.0f, 0.0f), std::make_unique<juce::AudioParameterFloat>("lfoLowpass", "LFO Lowpass", 0.0f, 1.0f, 0.0f), std::make_unique<juce::AudioParameterFloat>("lfoPan", "LFO Pan", 0.0f, 1.0f, 0.0f)}),
       lastKnownBPM(120.0),
       delayLine(44100 * 5),
       lfo([](float x)
@@ -23,6 +23,10 @@ AudioDelayAudioProcessor::AudioDelayAudioProcessor()
     lfoFreqParameter = parameters.getRawParameterValue("lfoFreq");
     lfoAmountParameter = parameters.getRawParameterValue("lfoAmount");
     tempoSyncParameter = parameters.getRawParameterValue("tempoSync");
+    lfoBitcrushParameter = parameters.getRawParameterValue("lfoBitcrush");
+    lfoHighpassParameter = parameters.getRawParameterValue("lfoHighpass");
+    lfoLowpassParameter = parameters.getRawParameterValue("lfoLowpass");
+    lfoPanParameter = parameters.getRawParameterValue("lfoPan");
 
     parameters.addParameterListener("tempoSync", this);
     parameters.addParameterListener("delay", this);
@@ -246,13 +250,6 @@ bool AudioDelayAudioProcessor::isBusesLayoutSupported(const BusesLayout &layouts
 
 void AudioDelayAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer, juce::MidiBuffer &midiMessages)
 {
-    static bool firstCall = true;
-    if (firstCall)
-    {
-        DBG("First call to processBlock");
-        firstCall = false;
-    }
-
     juce::ScopedNoDenormals noDenormals;
     auto totalNumInputChannels = getTotalNumInputChannels();
     auto totalNumOutputChannels = getTotalNumOutputChannels();
@@ -289,7 +286,7 @@ void AudioDelayAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer, ju
     float baseHighpassFreq = *highpassFreqParameter;
     float baseLowpassFreq = *lowpassFreqParameter;
 
-    lfo.setFrequency(lfoFreq);
+    float lfoIncrement = lfoFreq * LFO_OVERSAMPLING / getSampleRate();
 
     juce::AudioBuffer<float> dryBuffer(buffer);
     juce::AudioBuffer<float> wetBuffer(totalNumInputChannels, buffer.getNumSamples());
@@ -302,29 +299,41 @@ void AudioDelayAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer, ju
 
         for (int sample = 0; sample < buffer.getNumSamples(); ++sample)
         {
-            float lfoValue = lfo.processSample(0.0f);
-            float modifiedBitcrush = applyLFO(bitcrushAmount, lfoAmount, lfoValue, 1.0f, 16.0f);
+            float smoothedLFO = lfo.processSample(0.0f);
 
-            // Enhance filter modulation
-            float highpassModDepth = juce::jmap(lfoAmount, 0.5f, 4.0f);
-            float lowpassModDepth = juce::jmap(lfoAmount, 0.5f, 2.0f);
+            float modifiedBitcrush = bitcrushAmount;
+            if (lfoBitcrushParameter->load() > 0.5f)
+            {
+                modifiedBitcrush = applyLFO(bitcrushAmount, lfoAmount, smoothedLFO, 1.0f, 16.0f);
+            }
 
-            float modifiedHighpassFreq = juce::jlimit(
-                20.0f,
-                5000.0f,
-                baseHighpassFreq * std::pow(2.0f, highpassModDepth * (lfoValue * 2.0f - 1.0f)));
-
-            float modifiedLowpassFreq = juce::jlimit(
-                200.0f,
-                20000.0f,
-                baseLowpassFreq * std::pow(2.0f, lowpassModDepth * (lfoValue * 2.0f - 1.0f)));
+            float modifiedHighpassFreq = baseHighpassFreq;
+            float modifiedLowpassFreq = baseLowpassFreq;
+            if (lfoHighpassParameter->load() > 0.5f)
+            {
+                float highpassModDepth = juce::jmap(lfoAmount, 0.5f, 4.0f);
+                modifiedHighpassFreq = juce::jlimit(
+                    20.0f,
+                    5000.0f,
+                    baseHighpassFreq * std::pow(2.0f, highpassModDepth * (smoothedLFO * 2.0f - 1.0f)));
+            }
+            if (lfoLowpassParameter->load() > 0.5f)
+            {
+                float lowpassModDepth = juce::jmap(lfoAmount, 0.5f, 2.0f);
+                modifiedLowpassFreq = juce::jlimit(
+                    200.0f,
+                    20000.0f,
+                    baseLowpassFreq * std::pow(2.0f, lowpassModDepth * (smoothedLFO * 2.0f - 1.0f)));
+            }
 
             // Update filter coefficients for this sample
             *highpassFilter.state = *juce::dsp::IIR::Coefficients<float>::makeHighPass(getSampleRate(), modifiedHighpassFreq);
             *lowpassFilter.state = *juce::dsp::IIR::Coefficients<float>::makeLowPass(getSampleRate(), modifiedLowpassFreq);
 
+            float delayTime = delayParameter->load();
+            float delayInSamples = delayTime / 1000.0f * getSampleRate();
             float inputSample = inputData[sample];
-            float delaySample = delayLine.popSample(channel);
+            float delaySample = delayLine.popSample(channel, delayInSamples);
 
             // Apply bitcrushing to the delayed signal
             if (modifiedBitcrush < 16.0f)
@@ -363,7 +372,11 @@ void AudioDelayAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer, ju
     }
 
     // Apply panning to wet signal only
-    float modifiedPan = applyLFOToPan(pan, lfoAmount, lfo.processSample(0.0f));
+    float modifiedPan = pan;
+    if (lfoPanParameter->load() > 0.5f)
+    {
+        modifiedPan = applyLFOToPan(pan, lfoAmount, lfo.processSample(0.0f));
+    }
     juce::dsp::AudioBlock<float> wetPanBlock(wetBuffer);
     juce::dsp::ProcessContextReplacing<float> wetPanContext(wetPanBlock);
     panner.setPan(modifiedPan);

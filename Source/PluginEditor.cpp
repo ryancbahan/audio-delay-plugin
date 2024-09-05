@@ -4,7 +4,42 @@
 AudioDelayAudioProcessorEditor::AudioDelayAudioProcessorEditor(AudioDelayAudioProcessor &p)
     : AudioProcessorEditor(&p), audioProcessor(p)
 {
-  setSize(700, 400);
+  setSize(700, 500);
+
+  auto setupSwitch = [this](juce::ToggleButton &button, juce::Label &label, const juce::String &labelText)
+  {
+    addAndMakeVisible(button);
+    button.setToggleState(false, juce::dontSendNotification);
+
+    // Style the ToggleButton
+    button.setColour(juce::ToggleButton::tickColourId, juce::Colours::red);
+    button.setColour(juce::ToggleButton::tickDisabledColourId, juce::Colours::grey);
+    button.setColour(juce::ToggleButton::textColourId, juce::Colours::black);
+
+    // Make the button larger and change its appearance
+    button.setButtonText(labelText);
+    button.changeWidthToFitText();
+    button.setSize(button.getWidth() + 20, 30); // Add some padding
+
+    label.setText(labelText, juce::dontSendNotification);
+    label.setJustificationType(juce::Justification::centred);
+    label.setColour(juce::Label::textColourId, juce::Colours::black);
+    addAndMakeVisible(label);
+  };
+
+  setupSwitch(lfoBitcrushSwitch, lfoBitcrushLabel, "LFO Bitcrush");
+  setupSwitch(lfoHighpassSwitch, lfoHighpassLabel, "LFO Highpass");
+  setupSwitch(lfoLowpassSwitch, lfoLowpassLabel, "LFO Lowpass");
+  setupSwitch(lfoPanSwitch, lfoPanLabel, "LFO Pan");
+
+  lfoBitcrushAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(
+      audioProcessor.getParameters(), "lfoBitcrush", lfoBitcrushSwitch);
+  lfoHighpassAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(
+      audioProcessor.getParameters(), "lfoHighpass", lfoHighpassSwitch);
+  lfoLowpassAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(
+      audioProcessor.getParameters(), "lfoLowpass", lfoLowpassSwitch);
+  lfoPanAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(
+      audioProcessor.getParameters(), "lfoPan", lfoPanSwitch);
 
   auto setupKnob = [this](juce::Slider &knob, juce::Label &label, const juce::String &labelText,
                           double rangeStart, double rangeEnd, double interval)
@@ -108,6 +143,11 @@ AudioDelayAudioProcessorEditor::AudioDelayAudioProcessorEditor(AudioDelayAudioPr
       audioProcessor.getParameters(), "tempoSync", tempoSyncBox);
 
   updateDelayKnob();
+
+  lfoBitcrushSwitch.toFront(false);
+  lfoHighpassSwitch.toFront(false);
+  lfoLowpassSwitch.toFront(false);
+  lfoPanSwitch.toFront(false);
 }
 
 AudioDelayAudioProcessorEditor::~AudioDelayAudioProcessorEditor()
@@ -135,7 +175,7 @@ void AudioDelayAudioProcessorEditor::resized()
 {
   auto area = getLocalBounds().reduced(20);
   int width = area.getWidth() / 5;
-  int height = area.getHeight() / 2;
+  int height = area.getHeight() / 3;
 
   tempoSyncBox.setBounds(width * 0, height * 0, width, 20);
   delayKnob.setBounds(width * 0, height * 0 + 20, width, height - 20);
@@ -147,6 +187,19 @@ void AudioDelayAudioProcessorEditor::resized()
   // Adjust LFO Freq and Amount knob positions
   lfoFreqKnob.setBounds(width * 3, height * 1 + 40, width, height - 60);
   lfoAmountKnob.setBounds(width * 4, height * 1, width, height - 20);
+
+  auto layoutSwitch = [this, width, height](juce::ToggleButton &button, juce::Label &label, int col)
+  {
+    int x = width * col;
+    int y = height * 2;
+    button.setBounds(x, y, width, 20);
+    label.setBounds(x, y + 20, width, 20);
+  };
+
+  layoutSwitch(lfoBitcrushSwitch, lfoBitcrushLabel, 0);
+  layoutSwitch(lfoHighpassSwitch, lfoHighpassLabel, 1);
+  layoutSwitch(lfoLowpassSwitch, lfoLowpassLabel, 2);
+  layoutSwitch(lfoPanSwitch, lfoPanLabel, 3);
 
   auto layoutKnob = [this, width, height](juce::Slider &knob, juce::Label &label, int row, int col)
   {
@@ -166,6 +219,12 @@ void AudioDelayAudioProcessorEditor::resized()
   layoutKnob(lowpassFreqKnob, lowpassFreqLabel, 1, 2);
   layoutKnob(lfoFreqKnob, lfoFreqLabel, 1, 3);
   layoutKnob(lfoAmountKnob, lfoAmountLabel, 1, 4);
+
+  // Ensure the switches are visible by setting their bounds directly
+  lfoBitcrushSwitch.setBounds(width * 0, height * 2, width, 20);
+  lfoHighpassSwitch.setBounds(width * 1, height * 2, width, 20);
+  lfoLowpassSwitch.setBounds(width * 2, height * 2, width, 20);
+  lfoPanSwitch.setBounds(width * 3, height * 2, width, 20);
 }
 
 void AudioDelayAudioProcessorEditor::setAllLabelsBlack()

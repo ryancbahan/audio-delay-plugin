@@ -20,6 +20,11 @@ private:
 
   AudioDelayAudioProcessor &audioProcessor;
 
+  juce::ToggleButton lfoBitcrushSwitch;
+  juce::ToggleButton lfoHighpassSwitch;
+  juce::ToggleButton lfoLowpassSwitch;
+  juce::ToggleButton lfoPanSwitch;
+
   juce::Slider delayKnob;
   juce::Slider feedbackKnob;
   juce::Slider mixKnob;
@@ -47,7 +52,15 @@ private:
   juce::Label filterQLabel;
   juce::Label lfoFreqLabel;
   juce::Label lfoAmountLabel;
+  juce::Label lfoBitcrushLabel;
+  juce::Label lfoHighpassLabel;
+  juce::Label lfoLowpassLabel;
+  juce::Label lfoPanLabel;
 
+  std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> lfoBitcrushAttachment;
+  std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> lfoHighpassAttachment;
+  std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> lfoLowpassAttachment;
+  std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> lfoPanAttachment;
   std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> lfoTempoSyncAttachment;
   std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> highpassFreqAttachment;
   std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> lowpassFreqAttachment;

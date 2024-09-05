@@ -61,9 +61,14 @@ public:
     ThirtySecondDot
   };
 
+  static const int LFO_OVERSAMPLING = 4;
+  float lfoPhase = 0.0f;
+  float smoothedLFO = 0.0f;
+  float smoothingCoefficient = 0.99f;
+
 private:
   juce::AudioProcessorValueTreeState parameters;
-  juce::dsp::DelayLine<float, juce::dsp::DelayLineInterpolationTypes::Linear> delayLine;
+  juce::dsp::DelayLine<float, juce::dsp::DelayLineInterpolationTypes::Lagrange3rd> delayLine;
   juce::dsp::DryWetMixer<float> dryWetMixer;
   juce::dsp::Panner<float> panner;
   juce::dsp::Oscillator<float> lfo;
@@ -85,6 +90,10 @@ private:
   std::atomic<float> *lfoFreqParameter = nullptr;
   std::atomic<float> *lfoAmountParameter = nullptr;
   std::atomic<float> *tempoSyncParameter = nullptr;
+  std::atomic<float> *lfoBitcrushParameter = nullptr;
+  std::atomic<float> *lfoHighpassParameter = nullptr;
+  std::atomic<float> *lfoLowpassParameter = nullptr;
+  std::atomic<float> *lfoPanParameter = nullptr;
 
   std::atomic<float> *lfoTempoSyncParameter = nullptr;
 
