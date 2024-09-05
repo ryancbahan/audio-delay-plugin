@@ -101,9 +101,9 @@ void AudioDelayAudioProcessor::changeProgramName(int index, const juce::String &
 
 void AudioDelayAudioProcessor::updateLFOFrequencyFromSync()
 {
-    if (lfoTempoSyncParameter == nullptr)
+    if (lfoTempoSyncParameter == nullptr || lfoFreqParameter == nullptr)
     {
-        DBG("lfoTempoSyncParameter is null");
+        DBG("lfoTempoSyncParameter or lfoFreqParameter is null");
         return;
     }
 
@@ -172,17 +172,20 @@ void AudioDelayAudioProcessor::updateLFOFrequencyFromSync()
             lfoFreq = static_cast<float>(1.0 / (quarterNoteTime / 8 * 1.5));
             break;
         }
+
+        lfoFreq = juce::jlimit(0.01f, 20.0f, lfoFreq);
+
+        // Update the knob position without triggering the parameterChanged callback
+        if (auto *param = parameters.getParameter("lfoFreq"))
+        {
+            float normalizedValue = param->convertTo0to1(lfoFreq);
+            param->setValueNotifyingHost(normalizedValue);
+        }
     }
 
-    lfoFreq = juce::jlimit(0.1f, 20.0f, lfoFreq);
-    lfo.setFrequency(lfoFreq);
-
-    // Update the AudioProcessorValueTreeState parameter
-    if (auto *param = parameters.getParameter("lfoFreq"))
-    {
-        float normalizedValue = param->convertTo0to1(lfoFreq);
-        param->setValueNotifyingHost(normalizedValue);
-    }
+    // Always set the LFO frequency from the parameter value
+    lfo.setFrequency(*lfoFreqParameter);
+    DBG("LFO Frequency updated to: " << *lfoFreqParameter << " Hz (Sync mode: " << syncMode << ")");
 }
 
 void AudioDelayAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
@@ -254,6 +257,13 @@ void AudioDelayAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer, ju
     auto totalNumInputChannels = getTotalNumInputChannels();
     auto totalNumOutputChannels = getTotalNumOutputChannels();
 
+    float currentLfoFreq = *lfoFreqParameter;
+    if (std::abs(currentLfoFreq - lfo.getFrequency()) > 0.001f)
+    {
+        lfo.setFrequency(currentLfoFreq);
+        DBG("LFO Frequency updated in processBlock: " << currentLfoFreq << " Hz");
+    }
+
     // Update BPM if changed
     auto playHead = getPlayHead();
     if (playHead != nullptr)
@@ -281,12 +291,10 @@ void AudioDelayAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer, ju
     float bitcrushAmount = *bitcrushParameter;
     float stereoWidth = *stereoWidthParameter;
     float pan = *panParameter;
-    float lfoFreq = *lfoFreqParameter;
+    float lfoFreq = lfo.getFrequency(); // Use the frequency set by updateLFOFrequencyFromSync
     float lfoAmount = *lfoAmountParameter;
     float baseHighpassFreq = *highpassFreqParameter;
     float baseLowpassFreq = *lowpassFreqParameter;
-
-    float lfoIncrement = lfoFreq * LFO_OVERSAMPLING / getSampleRate();
 
     juce::AudioBuffer<float> dryBuffer(buffer);
     juce::AudioBuffer<float> wetBuffer(totalNumInputChannels, buffer.getNumSamples());
@@ -437,9 +445,19 @@ void AudioDelayAudioProcessor::parameterChanged(const juce::String &parameterID,
 {
     DBG("Parameter changed: " << parameterID << " = " << newValue);
 
-    if (parameterID == "tempoSync" || parameterID == "delay" || parameterID == "lfoTempoSync" || parameterID == "lfoFreq")
+    if (parameterID == "tempoSync" || parameterID == "delay")
     {
-        startTimerHz(30);
+        startTimerHz(30); // This will trigger updateDelayTimeFromSync()
+    }
+    else if (parameterID == "lfoTempoSync")
+    {
+        updateLFOFrequencyFromSync();
+    }
+    else if (parameterID == "lfoFreq")
+    {
+        // Always update the LFO frequency when the knob is moved
+        lfo.setFrequency(newValue);
+        DBG("LFO Frequency set to: " << newValue << " Hz");
     }
     else if (parameterID == "highpassFreq" || parameterID == "lowpassFreq")
     {

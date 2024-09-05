@@ -65,6 +65,8 @@ public:
   float lfoPhase = 0.0f;
   float smoothedLFO = 0.0f;
   float smoothingCoefficient = 0.99f;
+  bool isUpdatingLFOFreqFromSync = false;
+  float lastManualLfoFreq = 1.0f;
 
 private:
   juce::AudioProcessorValueTreeState parameters;
