@@ -77,6 +77,11 @@ public:
   float processDiffusionFilters(float input);
 
 private:
+  float chorusRate = 1.0f;    // Hz
+  float chorusDepth = 0.002f; // 0.2% depth
+  float chorusPhase = 0.0f;
+  float chorusPhaseIncrement;
+
   juce::AudioProcessorValueTreeState parameters;
   juce::dsp::DelayLine<float, juce::dsp::DelayLineInterpolationTypes::Lagrange3rd> delayLine;
   juce::dsp::DryWetMixer<float> dryWetMixer;
