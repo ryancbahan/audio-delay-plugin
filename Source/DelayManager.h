@@ -11,7 +11,7 @@ public:
     float getDelay() const { return delayLine.getDelay(); }
     float popSample(int channel, float delayInSamples);
     void pushSample(int channel, float sample);
-    void updateDelayTimeFromSync(float bpm, int syncMode);
+    float updateDelayTimeFromSync(float bpm, int syncMode);
     float getMaximumDelayInSeconds() const;
 
 private:

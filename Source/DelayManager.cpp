@@ -27,7 +27,7 @@ void DelayManager::pushSample(int channel, float sample)
     delayLine.pushSample(channel, sample);
 }
 
-void DelayManager::updateDelayTimeFromSync(float bpm, int syncMode)
+float DelayManager::updateDelayTimeFromSync(float bpm, int syncMode)
 {
     lastKnownBPM = bpm;
     double beatsPerSecond = bpm / 60.0;
@@ -36,9 +36,9 @@ void DelayManager::updateDelayTimeFromSync(float bpm, int syncMode)
 
     switch (syncMode)
     {
-    case 0:     // Free
-        return; // Don't change the delay time
-    case 1:     // 1/1
+    case 0:          // Free
+        return 0.0f; // Don't change the delay time
+    case 1:          // 1/1
         delayTime = static_cast<float>(quarterNoteTime * 4);
         break;
     case 2: // 1/2
@@ -95,10 +95,7 @@ void DelayManager::updateDelayTimeFromSync(float bpm, int syncMode)
     }
 
     float maxDelayTime = getMaximumDelayInSeconds() * 1000.0f; // Convert to milliseconds
-    delayTime = juce::jlimit(0.0f, maxDelayTime, delayTime);
-
-    float delayInSamples = delayTime / 1000.0f * sampleRate;
-    setDelay(delayInSamples);
+    return juce::jlimit(0.0f, maxDelayTime, delayTime);
 }
 
 float DelayManager::getMaximumDelayInSeconds() const

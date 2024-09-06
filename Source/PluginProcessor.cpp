@@ -111,27 +111,27 @@ juce::AudioProcessorValueTreeState::ParameterLayout AudioDelayAudioProcessor::cr
 
 void AudioDelayAudioProcessor::updateDelayTimeFromSync()
 {
-    float delayTime = delayParameter->load();
     int syncMode = static_cast<int>(tempoSyncParameter->load());
+    float currentDelayTime = delayParameter->load();
 
-    if (syncMode != 0) // 0 is assumed to be "Free" mode
+    if (syncMode != 0) // Not in Free mode
     {
-        delayManager.updateDelayTimeFromSync(static_cast<float>(lastKnownBPM), syncMode);
+        float syncedDelayTime = delayManager.updateDelayTimeFromSync(static_cast<float>(lastKnownBPM), syncMode);
 
-        // Get the new delay time from the delay manager
-        float delayInSamples = delayManager.getDelay();
-        delayTime = (delayInSamples / getSampleRate()) * 1000.0f; // Convert to milliseconds
+        // Only update the knob value if in sync mode and we got a valid delay time
+        if (syncedDelayTime > 0.0f)
+        {
+            if (auto *param = parameters.getParameter("delay"))
+            {
+                float normalizedValue = param->convertTo0to1(syncedDelayTime);
+                param->setValueNotifyingHost(normalizedValue);
+            }
+        }
     }
 
-    // Update the delay parameter to reflect the new delay time
-    delayParameter->store(delayTime);
-
-    // Update the AudioProcessorValueTreeState parameter
-    if (auto *param = parameters.getParameter("delay"))
-    {
-        float normalizedValue = param->convertTo0to1(delayTime);
-        param->setValueNotifyingHost(normalizedValue);
-    }
+    // Always set the delay time from the knob value
+    float delayInSamples = currentDelayTime / 1000.0f * getSampleRate();
+    delayManager.setDelay(delayInSamples);
 }
 
 const juce::String AudioDelayAudioProcessor::getName() const
@@ -555,13 +555,19 @@ void AudioDelayAudioProcessor::setStateInformation(const void *data, int sizeInB
 
 void AudioDelayAudioProcessor::parameterChanged(const juce::String &parameterID, float newValue)
 {
+
+    if (parameterID == "delay")
+    {
+        float delayInSamples = newValue / 1000.0f * getSampleRate();
+        delayManager.setDelay(delayInSamples);
+    }
+    else if (parameterID == "tempoSync")
+    {
+        updateDelayTimeFromSync();
+    }
     if (parameterID == "smear")
     {
         updateDiffusionFilters();
-    }
-    else if (parameterID == "tempoSync" || parameterID == "delay")
-    {
-        startTimerHz(30); // This will trigger updateDelayTimeFromSync()
     }
     else if (parameterID == "lfoTempoSync")
     {
