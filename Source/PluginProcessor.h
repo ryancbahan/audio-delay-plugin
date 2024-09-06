@@ -3,6 +3,8 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_dsp/juce_dsp.h>
 #include <juce_core/juce_core.h>
+#include "LFOManager.h"
+#include "DelayManager.h"
 
 class AudioDelayAudioProcessor : public juce::AudioProcessor,
                                  public juce::AudioProcessorValueTreeState::Listener,
@@ -36,8 +38,6 @@ public:
 
   juce::AudioProcessorValueTreeState &getParameters() { return parameters; }
 
-  void updateDelayTimeFromSync();
-
   enum TempoSync
   {
     Unsync,
@@ -61,35 +61,20 @@ public:
     ThirtySecondDot
   };
 
-  static const int LFO_OVERSAMPLING = 4;
-  float lfoPhase = 0.0f;
-  float smoothedLFO = 0.0f;
-  float smoothingCoefficient = 0.99f;
-  bool isUpdatingLFOFreqFromSync = false;
-  float lastManualLfoFreq = 1.0f;
-
-  std::array<juce::dsp::StateVariableTPTFilter<float>, 4> diffusionFilters;
-  juce::dsp::StateVariableTPTFilter<float> preDiffusionLowpass;
-  juce::dsp::StateVariableTPTFilter<float> postDiffusionLowpass;
-  std::atomic<float> *smearParameter = nullptr;
-
-  void updateDiffusionFilters();
-  float processDiffusionFilters(float input);
-
 private:
-  float chorusRate = 1.0f;    // Hz
-  float chorusDepth = 0.002f; // 0.2% depth
-  float chorusPhase = 0.0f;
-  float chorusPhaseIncrement;
-
   juce::AudioProcessorValueTreeState parameters;
-  juce::dsp::DelayLine<float, juce::dsp::DelayLineInterpolationTypes::Lagrange3rd> delayLine;
+  LFOManager lfoManager;
+  DelayManager delayManager;
   juce::dsp::DryWetMixer<float> dryWetMixer;
   juce::dsp::Panner<float> panner;
-  juce::dsp::Oscillator<float> lfo;
 
   juce::dsp::ProcessorDuplicator<juce::dsp::IIR::Filter<float>, juce::dsp::IIR::Coefficients<float>> highpassFilter;
   juce::dsp::ProcessorDuplicator<juce::dsp::IIR::Filter<float>, juce::dsp::IIR::Coefficients<float>> lowpassFilter;
+
+  static const int NUM_DIFFUSION_FILTERS = 4;
+  std::array<juce::dsp::StateVariableTPTFilter<float>, NUM_DIFFUSION_FILTERS> diffusionFilters;
+  juce::dsp::StateVariableTPTFilter<float> preDiffusionLowpass;
+  juce::dsp::StateVariableTPTFilter<float> postDiffusionLowpass;
 
   std::array<juce::dsp::IIR::Filter<float>, 2> dcBlocker;
   std::array<juce::dsp::IIR::Filter<float>, 2> finalDCBlocker;
@@ -109,17 +94,35 @@ private:
   std::atomic<float> *lfoHighpassParameter = nullptr;
   std::atomic<float> *lfoLowpassParameter = nullptr;
   std::atomic<float> *lfoPanParameter = nullptr;
-
   std::atomic<float> *lfoTempoSyncParameter = nullptr;
+  std::atomic<float> *smearParameter = nullptr;
 
-  void updateLFOFrequencyFromSync();
+  double lastKnownBPM;
+  float chorusRate;
+  float chorusDepth;
+  float chorusPhase;
+  float chorusPhaseIncrement;
 
-  double lastKnownBPM = 120.0;
-
+  juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
+  void updateLFOFrequency();
+  void updateBPMIfChanged();
+  void processDelayAndEffects(int channel, int sample, const float *inputData, float *wetData, float feedback, float bitcrushAmount, float smearAmount, float lfoAmount);
+  float applyLFOToBitcrush(float bitcrushAmount, float lfoAmount, float smoothedLFO);
+  void applyLFOToFilters(float smoothedLFO, float lfoAmount);
+  float processDelaySample(int channel, float delayInSamples, float smearAmount);
+  void updateChorusPhase();
+  void applyFiltersToWetSignal(juce::AudioBuffer<float> &wetBuffer);
+  void applyStereoWidth(juce::AudioBuffer<float> &wetBuffer, float stereoWidth);
+  void applyPanning(juce::AudioBuffer<float> &wetBuffer, float pan, float lfoAmount);
+  void mixDryWetSignals(juce::AudioBuffer<float> &buffer, const juce::AudioBuffer<float> &dryBuffer, const juce::AudioBuffer<float> &wetBuffer, float mix);
+  void applyFinalDCBlocking(juce::AudioBuffer<float> &buffer);
   void updateFilterParameters();
+  void updateDiffusionFilters();
+  float processDiffusionFilters(float input);
   float applyBitcrushing(float sample, float bitcrushAmount);
   float applyLFO(float baseValue, float lfoAmount, float lfoValue, float minValue, float maxValue);
   float applyLFOToPan(float basePan, float lfoAmount, float lfoValue);
+  void updateDelayTimeFromSync();
 
   JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AudioDelayAudioProcessor)
 };

@@ -32,6 +32,8 @@ target_sources(AudioDelay
     PRIVATE
         Source/PluginProcessor.cpp
         Source/PluginEditor.cpp
+        Source/LFOManager.cpp
+        Source/DelayManager.cpp
 )
 
 # Add JUCE modules
