@@ -68,6 +68,14 @@ public:
   bool isUpdatingLFOFreqFromSync = false;
   float lastManualLfoFreq = 1.0f;
 
+  std::array<juce::dsp::StateVariableTPTFilter<float>, 4> diffusionFilters;
+  juce::dsp::StateVariableTPTFilter<float> preDiffusionLowpass;
+  juce::dsp::StateVariableTPTFilter<float> postDiffusionLowpass;
+  std::atomic<float> *smearParameter = nullptr;
+
+  void updateDiffusionFilters();
+  float processDiffusionFilters(float input);
+
 private:
   juce::AudioProcessorValueTreeState parameters;
   juce::dsp::DelayLine<float, juce::dsp::DelayLineInterpolationTypes::Lagrange3rd> delayLine;

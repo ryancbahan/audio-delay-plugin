@@ -57,6 +57,8 @@ AudioDelayAudioProcessorEditor::AudioDelayAudioProcessorEditor(AudioDelayAudioPr
     addAndMakeVisible(label);
   };
 
+  setupKnob(smearKnob, smearLabel, "Smear20", 0.0, 1.0, 0.01);
+
   setupKnob(delayKnob, delayLabel, "Delay", 0.0, 5000.0, 1.0);
   setupKnob(feedbackKnob, feedbackLabel, "Feedback", 0.0, 0.95, 0.01);
   setupKnob(mixKnob, mixLabel, "Dry/Wet", 0.0, 1.0, 0.01);
@@ -68,6 +70,8 @@ AudioDelayAudioProcessorEditor::AudioDelayAudioProcessorEditor(AudioDelayAudioPr
   setupKnob(lfoFreqKnob, lfoFreqLabel, "LFO Freq", 0.1, 20.0, 0.1);
   setupKnob(lfoAmountKnob, lfoAmountLabel, "LFO Amount", 0.0, 1.0, 0.01);
 
+  smearAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
+      audioProcessor.getParameters(), "smear", smearKnob);
   delayAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
       audioProcessor.getParameters(), "delay", delayKnob);
   feedbackAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
@@ -219,6 +223,7 @@ void AudioDelayAudioProcessorEditor::resized()
   layoutKnob(lowpassFreqKnob, lowpassFreqLabel, 1, 2);
   layoutKnob(lfoFreqKnob, lfoFreqLabel, 1, 3);
   layoutKnob(lfoAmountKnob, lfoAmountLabel, 1, 4);
+  layoutKnob(smearKnob, smearLabel, 2, 4);
 
   // Ensure the switches are visible by setting their bounds directly
   lfoBitcrushSwitch.setBounds(width * 0, height * 2, width, 20);
@@ -231,7 +236,9 @@ void AudioDelayAudioProcessorEditor::setAllLabelsBlack()
 {
   juce::Label *labels[] = {
       &delayLabel, &feedbackLabel, &mixLabel, &bitcrushLabel, &stereoWidthLabel,
-      &panLabel, &highpassFreqLabel, &lowpassFreqLabel, &lfoFreqLabel, &lfoAmountLabel};
+      &panLabel, &highpassFreqLabel, &lowpassFreqLabel, &lfoFreqLabel, &lfoAmountLabel,
+      &smearLabel // Add this line
+  };
 
   for (auto *label : labels)
   {
@@ -243,7 +250,9 @@ void AudioDelayAudioProcessorEditor::setAllKnobsBlack()
 {
   juce::Slider *knobs[] = {
       &delayKnob, &feedbackKnob, &mixKnob, &bitcrushKnob, &stereoWidthKnob,
-      &panKnob, &highpassFreqKnob, &lowpassFreqKnob, &lfoFreqKnob, &lfoAmountKnob};
+      &panKnob, &highpassFreqKnob, &lowpassFreqKnob, &lfoFreqKnob, &lfoAmountKnob,
+      &smearKnob // Add this line
+  };
 
   for (auto *knob : knobs)
   {

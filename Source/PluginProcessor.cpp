@@ -5,7 +5,7 @@ AudioDelayAudioProcessor::AudioDelayAudioProcessor()
     : AudioProcessor(BusesProperties()
                          .withInput("Input", juce::AudioChannelSet::stereo(), true)
                          .withOutput("Output", juce::AudioChannelSet::stereo(), true)),
-      parameters(*this, nullptr, "Parameters", {std::make_unique<juce::AudioParameterFloat>("lfoBitcrush", "LFO Bitcrush", 0.0f, 1.0f, 0.0f), std::make_unique<juce::AudioParameterFloat>("lfoHighpass", "LFO Highpass", 0.0f, 1.0f, 0.0f), std::make_unique<juce::AudioParameterFloat>("lfoLowpass", "LFO Lowpass", 0.0f, 1.0f, 0.0f), std::make_unique<juce::AudioParameterFloat>("lfoPan", "LFO Pan", 0.0f, 1.0f, 0.0f), std::make_unique<juce::AudioParameterFloat>("delay", "Delay Time", 0.0f, 5000.0f, 500.0f), std::make_unique<juce::AudioParameterFloat>("feedback", "Feedback", 0.0f, 0.95f, 0.5f), std::make_unique<juce::AudioParameterFloat>("mix", "Dry/Wet Mix", 0.0f, 1.0f, 0.5f), std::make_unique<juce::AudioParameterFloat>("bitcrush", "Bitcrush", 1.0f, 16.0f, 16.0f), std::make_unique<juce::AudioParameterFloat>("stereoWidth", "Stereo Width", 0.0f, 2.0f, 1.0f), std::make_unique<juce::AudioParameterFloat>("pan", "Pan", -1.0f, 1.0f, 0.0f), std::make_unique<juce::AudioParameterFloat>("highpassFreq", "Highpass Freq", 20.0f, 5000.0f, 20.0f), std::make_unique<juce::AudioParameterFloat>("lowpassFreq", "Lowpass Freq", 200.0f, 20000.0f, 20000.0f), std::make_unique<juce::AudioParameterFloat>("lfoFreq", "LFO Frequency", 0.01f, 20.0f, 1.0f), std::make_unique<juce::AudioParameterFloat>("lfoAmount", "LFO Amount", 0.0f, 1.0f, 0.0f), std::make_unique<juce::AudioParameterChoice>("tempoSync", "Tempo Sync", juce::StringArray{"Free", "1/1", "1/2", "1/4", "1/8", "1/16", "1/32", "1/1T", "1/2T", "1/4T", "1/8T", "1/16T", "1/32T", "1/1D", "1/2D", "1/4D", "1/8D", "1/16D", "1/32D"}, 0), std::make_unique<juce::AudioParameterChoice>("lfoTempoSync", "LFO Tempo Sync", juce::StringArray{"Free", "1/1", "1/2", "1/4", "1/8", "1/16", "1/32", "1/1T", "1/2T", "1/4T", "1/8T", "1/16T", "1/32T", "1/1D", "1/2D", "1/4D", "1/8D", "1/16D", "1/32D"}, 0), std::make_unique<juce::AudioParameterFloat>("lfoBitcrush", "LFO Bitcrush", 0.0f, 1.0f, 0.0f), std::make_unique<juce::AudioParameterFloat>("lfoHighpass", "LFO Highpass", 0.0f, 1.0f, 0.0f), std::make_unique<juce::AudioParameterFloat>("lfoLowpass", "LFO Lowpass", 0.0f, 1.0f, 0.0f), std::make_unique<juce::AudioParameterFloat>("lfoPan", "LFO Pan", 0.0f, 1.0f, 0.0f)}),
+      parameters(*this, nullptr, "Parameters", {std::make_unique<juce::AudioParameterFloat>("smear", "Smear", 0.0f, 1.0f, 0.0f), std::make_unique<juce::AudioParameterFloat>("lfoBitcrush", "LFO Bitcrush", 0.0f, 1.0f, 0.0f), std::make_unique<juce::AudioParameterFloat>("lfoHighpass", "LFO Highpass", 0.0f, 1.0f, 0.0f), std::make_unique<juce::AudioParameterFloat>("lfoLowpass", "LFO Lowpass", 0.0f, 1.0f, 0.0f), std::make_unique<juce::AudioParameterFloat>("lfoPan", "LFO Pan", 0.0f, 1.0f, 0.0f), std::make_unique<juce::AudioParameterFloat>("delay", "Delay Time", 0.0f, 5000.0f, 500.0f), std::make_unique<juce::AudioParameterFloat>("feedback", "Feedback", 0.0f, 0.95f, 0.5f), std::make_unique<juce::AudioParameterFloat>("mix", "Dry/Wet Mix", 0.0f, 1.0f, 0.5f), std::make_unique<juce::AudioParameterFloat>("bitcrush", "Bitcrush", 1.0f, 16.0f, 16.0f), std::make_unique<juce::AudioParameterFloat>("stereoWidth", "Stereo Width", 0.0f, 2.0f, 1.0f), std::make_unique<juce::AudioParameterFloat>("pan", "Pan", -1.0f, 1.0f, 0.0f), std::make_unique<juce::AudioParameterFloat>("highpassFreq", "Highpass Freq", 20.0f, 5000.0f, 20.0f), std::make_unique<juce::AudioParameterFloat>("lowpassFreq", "Lowpass Freq", 200.0f, 20000.0f, 20000.0f), std::make_unique<juce::AudioParameterFloat>("lfoFreq", "LFO Frequency", 0.01f, 20.0f, 1.0f), std::make_unique<juce::AudioParameterFloat>("lfoAmount", "LFO Amount", 0.0f, 1.0f, 0.0f), std::make_unique<juce::AudioParameterChoice>("tempoSync", "Tempo Sync", juce::StringArray{"Free", "1/1", "1/2", "1/4", "1/8", "1/16", "1/32", "1/1T", "1/2T", "1/4T", "1/8T", "1/16T", "1/32T", "1/1D", "1/2D", "1/4D", "1/8D", "1/16D", "1/32D"}, 0), std::make_unique<juce::AudioParameterChoice>("lfoTempoSync", "LFO Tempo Sync", juce::StringArray{"Free", "1/1", "1/2", "1/4", "1/8", "1/16", "1/32", "1/1T", "1/2T", "1/4T", "1/8T", "1/16T", "1/32T", "1/1D", "1/2D", "1/4D", "1/8D", "1/16D", "1/32D"}, 0), std::make_unique<juce::AudioParameterFloat>("lfoBitcrush", "LFO Bitcrush", 0.0f, 1.0f, 0.0f), std::make_unique<juce::AudioParameterFloat>("lfoHighpass", "LFO Highpass", 0.0f, 1.0f, 0.0f), std::make_unique<juce::AudioParameterFloat>("lfoLowpass", "LFO Lowpass", 0.0f, 1.0f, 0.0f), std::make_unique<juce::AudioParameterFloat>("lfoPan", "LFO Pan", 0.0f, 1.0f, 0.0f)}),
       lastKnownBPM(120.0),
       delayLine(44100 * 5),
       lfo([](float x)
@@ -27,6 +27,7 @@ AudioDelayAudioProcessor::AudioDelayAudioProcessor()
     lfoHighpassParameter = parameters.getRawParameterValue("lfoHighpass");
     lfoLowpassParameter = parameters.getRawParameterValue("lfoLowpass");
     lfoPanParameter = parameters.getRawParameterValue("lfoPan");
+    smearParameter = parameters.getRawParameterValue("smear");
 
     parameters.addParameterListener("tempoSync", this);
     parameters.addParameterListener("delay", this);
@@ -188,6 +189,41 @@ void AudioDelayAudioProcessor::updateLFOFrequencyFromSync()
     DBG("LFO Frequency updated to: " << *lfoFreqParameter << " Hz (Sync mode: " << syncMode << ")");
 }
 
+void AudioDelayAudioProcessor::updateDiffusionFilters()
+{
+    float smearAmount = smearParameter->load();
+    float sampleRate = static_cast<float>(getSampleRate());
+
+    float delayTimes[4] = {0.0007f, 0.0011f, 0.0013f, 0.0017f}; // in seconds
+    float feedbackAmounts[4] = {0.3f, 0.35f, 0.4f, 0.45f};
+
+    for (size_t i = 0; i < 4; ++i)
+    {
+        float delayTime = delayTimes[i];
+        float feedback = juce::jlimit(0.0f, 0.5f, feedbackAmounts[i] * smearAmount);
+
+        float frequency = 1.0f / delayTime;
+        float q = 1.0f / (2.0f * (1.0f - feedback));
+
+        diffusionFilters[i].setCutoffFrequency(frequency);
+        diffusionFilters[i].setResonance(q);
+    }
+}
+
+float AudioDelayAudioProcessor::processDiffusionFilters(float input)
+{
+    float output = preDiffusionLowpass.processSample(0, input);
+
+    for (auto &filter : diffusionFilters)
+    {
+        output = filter.processSample(0, output);
+    }
+
+    output = postDiffusionLowpass.processSample(0, output);
+
+    return output;
+}
+
 void AudioDelayAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
     DBG("prepareToPlay called with sampleRate: " << sampleRate << " and samplesPerBlock: " << samplesPerBlock);
@@ -211,6 +247,20 @@ void AudioDelayAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBl
     highpassFilter.prepare(spec);
     lowpassFilter.prepare(spec);
 
+    for (auto &filter : diffusionFilters)
+    {
+        filter.prepare({sampleRate, static_cast<juce::uint32>(samplesPerBlock), 1});
+        filter.setType(juce::dsp::StateVariableTPTFilterType::bandpass); // Corrected from bandPass to bandpass
+    }
+
+    preDiffusionLowpass.prepare({sampleRate, static_cast<juce::uint32>(samplesPerBlock), 1});
+    preDiffusionLowpass.setType(juce::dsp::StateVariableTPTFilterType::lowpass); // Corrected from lowPass to lowpass
+    preDiffusionLowpass.setCutoffFrequency(10000.0f);
+
+    postDiffusionLowpass.prepare({sampleRate, static_cast<juce::uint32>(samplesPerBlock), 1});
+    postDiffusionLowpass.setType(juce::dsp::StateVariableTPTFilterType::lowpass); // Corrected from lowPass to lowpass
+    postDiffusionLowpass.setCutoffFrequency(10000.0f);
+
     for (auto &filter : dcBlocker)
     {
         filter.prepare(spec);
@@ -230,6 +280,7 @@ void AudioDelayAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBl
         DBG("Delay parameter range updated: 0.0f to 5000.0f");
     }
 
+    updateDiffusionFilters();
     updateDelayTimeFromSync();
     updateFilterParameters();
 
@@ -258,6 +309,7 @@ void AudioDelayAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer, ju
     auto totalNumOutputChannels = getTotalNumOutputChannels();
 
     float currentLfoFreq = *lfoFreqParameter;
+    float smearAmount = smearParameter->load();
     if (std::abs(currentLfoFreq - lfo.getFrequency()) > 0.001f)
     {
         lfo.setFrequency(currentLfoFreq);
@@ -291,13 +343,16 @@ void AudioDelayAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer, ju
     float bitcrushAmount = *bitcrushParameter;
     float stereoWidth = *stereoWidthParameter;
     float pan = *panParameter;
-    float lfoFreq = lfo.getFrequency(); // Use the frequency set by updateLFOFrequencyFromSync
+    float lfoFreq = lfo.getFrequency();
     float lfoAmount = *lfoAmountParameter;
     float baseHighpassFreq = *highpassFreqParameter;
     float baseLowpassFreq = *lowpassFreqParameter;
 
     juce::AudioBuffer<float> dryBuffer(buffer);
     juce::AudioBuffer<float> wetBuffer(totalNumInputChannels, buffer.getNumSamples());
+
+    // Update diffusion filters
+    updateDiffusionFilters();
 
     // Process delay and apply effects to wet signal only
     for (int channel = 0; channel < totalNumInputChannels; ++channel)
@@ -342,6 +397,13 @@ void AudioDelayAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer, ju
             float delayInSamples = delayTime / 1000.0f * getSampleRate();
             float inputSample = inputData[sample];
             float delaySample = delayLine.popSample(channel, delayInSamples);
+
+            // Apply smear (diffusion) to the delayed signal using the new method
+            if (smearAmount > 0.0f)
+            {
+                float diffusedSample = processDiffusionFilters(delaySample);
+                delaySample = delaySample * (1.0f - smearAmount) + diffusedSample * smearAmount;
+            }
 
             // Apply bitcrushing to the delayed signal
             if (modifiedBitcrush < 16.0f)
@@ -444,6 +506,11 @@ void AudioDelayAudioProcessor::setStateInformation(const void *data, int sizeInB
 void AudioDelayAudioProcessor::parameterChanged(const juce::String &parameterID, float newValue)
 {
     DBG("Parameter changed: " << parameterID << " = " << newValue);
+
+    if (parameterID == "smear")
+    {
+        updateDiffusionFilters();
+    }
 
     if (parameterID == "tempoSync" || parameterID == "delay")
     {

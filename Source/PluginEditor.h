@@ -57,6 +57,10 @@ private:
   juce::Label lfoLowpassLabel;
   juce::Label lfoPanLabel;
 
+  juce::Slider smearKnob;
+  juce::Label smearLabel;
+  std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> smearAttachment;
+
   std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> lfoBitcrushAttachment;
   std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> lfoHighpassAttachment;
   std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> lfoLowpassAttachment;
