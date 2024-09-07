@@ -138,54 +138,6 @@ void AudioDelayAudioProcessor::updateDelayTimeFromSync()
     delayManager.setDelay(delayInSamples);
 }
 
-const juce::String AudioDelayAudioProcessor::getName() const
-{
-    return JucePlugin_Name;
-}
-
-bool AudioDelayAudioProcessor::acceptsMidi() const
-{
-    return false;
-}
-
-bool AudioDelayAudioProcessor::producesMidi() const
-{
-    return false;
-}
-
-bool AudioDelayAudioProcessor::isMidiEffect() const
-{
-    return false;
-}
-
-double AudioDelayAudioProcessor::getTailLengthSeconds() const
-{
-    return 0.0;
-}
-
-int AudioDelayAudioProcessor::getNumPrograms()
-{
-    return 1;
-}
-
-int AudioDelayAudioProcessor::getCurrentProgram()
-{
-    return 0;
-}
-
-void AudioDelayAudioProcessor::setCurrentProgram(int index)
-{
-}
-
-const juce::String AudioDelayAudioProcessor::getProgramName(int index)
-{
-    return {};
-}
-
-void AudioDelayAudioProcessor::changeProgramName(int index, const juce::String &newName)
-{
-}
-
 void AudioDelayAudioProcessor::updateDiffusionFilters()
 {
     float smearAmount = smearParameter->load();
@@ -294,21 +246,6 @@ void AudioDelayAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBl
     float delayTime = delayParameter->load();
     float delayInSamples = delayTime / 1000.0f * sampleRate;
     delayManager.setDelay(delayInSamples);
-}
-
-void AudioDelayAudioProcessor::releaseResources()
-{
-}
-
-bool AudioDelayAudioProcessor::isBusesLayoutSupported(const BusesLayout &layouts) const
-{
-    if (layouts.getMainOutputChannelSet() != juce::AudioChannelSet::mono() && layouts.getMainOutputChannelSet() != juce::AudioChannelSet::stereo())
-        return false;
-
-    if (layouts.getMainOutputChannelSet() != layouts.getMainInputChannelSet())
-        return false;
-
-    return true;
 }
 
 void AudioDelayAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer, juce::MidiBuffer &midiMessages)
@@ -582,31 +519,6 @@ void AudioDelayAudioProcessor::processDelayAndEffects(int channel, int sample, c
     }
 }
 
-bool AudioDelayAudioProcessor::hasEditor() const
-{
-    return true;
-}
-
-juce::AudioProcessorEditor *AudioDelayAudioProcessor::createEditor()
-{
-    return new AudioDelayAudioProcessorEditor(*this);
-}
-
-void AudioDelayAudioProcessor::getStateInformation(juce::MemoryBlock &destData)
-{
-    auto state = parameters.copyState();
-    std::unique_ptr<juce::XmlElement> xml(state.createXml());
-    copyXmlToBinary(*xml, destData);
-}
-
-void AudioDelayAudioProcessor::setStateInformation(const void *data, int sizeInBytes)
-{
-    std::unique_ptr<juce::XmlElement> xmlState(getXmlFromBinary(data, sizeInBytes));
-    if (xmlState.get() != nullptr)
-        if (xmlState->hasTagName(parameters.state.getType()))
-            parameters.replaceState(juce::ValueTree::fromXml(*xmlState));
-}
-
 void AudioDelayAudioProcessor::parameterChanged(const juce::String &parameterID, float newValue)
 {
 
@@ -735,4 +647,92 @@ float AudioDelayAudioProcessor::applyLFOToDelay(float delayInSamples, float lfoA
 juce::AudioProcessor *JUCE_CALLTYPE createPluginFilter()
 {
     return new AudioDelayAudioProcessor();
+}
+
+const juce::String AudioDelayAudioProcessor::getName() const
+{
+    return JucePlugin_Name;
+}
+
+bool AudioDelayAudioProcessor::acceptsMidi() const
+{
+    return false;
+}
+
+bool AudioDelayAudioProcessor::producesMidi() const
+{
+    return false;
+}
+
+bool AudioDelayAudioProcessor::isMidiEffect() const
+{
+    return false;
+}
+
+double AudioDelayAudioProcessor::getTailLengthSeconds() const
+{
+    return 0.0;
+}
+
+int AudioDelayAudioProcessor::getNumPrograms()
+{
+    return 1;
+}
+
+int AudioDelayAudioProcessor::getCurrentProgram()
+{
+    return 0;
+}
+
+void AudioDelayAudioProcessor::setCurrentProgram(int index)
+{
+}
+
+const juce::String AudioDelayAudioProcessor::getProgramName(int index)
+{
+    return {};
+}
+
+void AudioDelayAudioProcessor::changeProgramName(int index, const juce::String &newName)
+{
+}
+
+bool AudioDelayAudioProcessor::hasEditor() const
+{
+    return true;
+}
+
+juce::AudioProcessorEditor *AudioDelayAudioProcessor::createEditor()
+{
+    return new AudioDelayAudioProcessorEditor(*this);
+}
+
+void AudioDelayAudioProcessor::getStateInformation(juce::MemoryBlock &destData)
+{
+    auto state = parameters.copyState();
+    std::unique_ptr<juce::XmlElement> xml(state.createXml());
+    copyXmlToBinary(*xml, destData);
+}
+
+void AudioDelayAudioProcessor::setStateInformation(const void *data, int sizeInBytes)
+{
+    std::unique_ptr<juce::XmlElement> xmlState(getXmlFromBinary(data, sizeInBytes));
+    if (xmlState.get() != nullptr)
+        if (xmlState->hasTagName(parameters.state.getType()))
+            parameters.replaceState(juce::ValueTree::fromXml(*xmlState));
+}
+
+void AudioDelayAudioProcessor::releaseResources()
+{
+}
+
+bool AudioDelayAudioProcessor::isBusesLayoutSupported(const BusesLayout &layouts) const
+{
+    if (layouts.getMainOutputChannelSet() != juce::AudioChannelSet::mono() && layouts.getMainOutputChannelSet() != juce::AudioChannelSet::stereo())
+        return false;
+
+    if (layouts.getMainOutputChannelSet() != layouts.getMainInputChannelSet())
+        return false;
+
+    return true;
 }
