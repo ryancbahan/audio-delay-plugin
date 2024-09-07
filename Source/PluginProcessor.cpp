@@ -31,13 +31,17 @@ AudioDelayAudioProcessor::AudioDelayAudioProcessor()
     smearParameter = parameters.getRawParameterValue("smear");
     lfoTempoSyncParameter = parameters.getRawParameterValue("lfoTempoSync");
     lfoDelayParameter = parameters.getRawParameterValue("lfoDelay");
+    waveshapeAmountParameter = parameters.getRawParameterValue("waveshapeAmount");
 
     parameters.addParameterListener("tempoSync", this);
     parameters.addParameterListener("delay", this);
     parameters.addParameterListener("lfoTempoSync", this);
     parameters.addParameterListener("lfoFreq", this);
 
-    // We'll initialize the LFO and delay in prepareToPlay instead of here
+    waveShaper.functionToUse = [](float x)
+    {
+        return juce::jlimit(float(-0.1), float(0.1), x); // [6]
+    };
 
     DBG("AudioDelayAudioProcessor constructor completed");
 }
@@ -55,6 +59,8 @@ AudioDelayAudioProcessor::~AudioDelayAudioProcessor()
 juce::AudioProcessorValueTreeState::ParameterLayout AudioDelayAudioProcessor::createParameterLayout()
 {
     std::vector<std::unique_ptr<juce::RangedAudioParameter>> params;
+
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("waveshapeAmount", "Waveshape Amount", 0.0f, 1.0f, 0.5f));
 
     // Delay
     params.push_back(std::make_unique<juce::AudioParameterFloat>("delay", "Delay Time", 0.0f, 5000.0f, 500.0f));
@@ -173,7 +179,7 @@ float AudioDelayAudioProcessor::processDiffusionFilters(float input)
     for (size_t i = 0; i < diffusionFilters.size(); ++i)
     {
         // Calculate modulated delay time for chorusing, scaled by smear amount
-        float modulation = std::sin(chorusPhase + i * 0.5f) * chorusDepth * smearAmount;
+        float modulation = std::sin(chorusPhase + i * 1.0f) * chorusDepth * smearAmount;
         float modulatedFrequency = juce::jlimit(20.0f, static_cast<float>(getSampleRate()) * 0.49f, diffusionFilters[i].getCutoffFrequency() * (1.0f + modulation));
 
         // Update filter parameters
@@ -197,6 +203,9 @@ void AudioDelayAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBl
     spec.sampleRate = sampleRate;
     spec.maximumBlockSize = static_cast<juce::uint32>(samplesPerBlock);
     spec.numChannels = static_cast<juce::uint32>(getTotalNumOutputChannels());
+
+    convolution.prepare(spec);
+    waveShaper.prepare(spec);
 
     delayManager.prepare(spec);
     dryWetMixer.prepare(spec);
@@ -260,6 +269,9 @@ void AudioDelayAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer, ju
     float currentLFOFreq = lfoFreqParameter->load();
     DBG("Current LFO Frequency: " << currentLFOFreq << " Hz");
 
+    float bitcrushAmount = bitcrushParameter->load();
+    float waveshapeAmount = waveshapeAmountParameter->load();
+
     lfoManager.setFrequency(currentLFOFreq);
     lfoManager.generateBlock(buffer.getNumSamples());
 
@@ -282,7 +294,6 @@ void AudioDelayAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer, ju
     // Get current parameter values
     float feedback = feedbackParameter->load();
     float mix = mixParameter->load();
-    float bitcrushAmount = bitcrushParameter->load();
     float stereoWidth = stereoWidthParameter->load();
     float pan = panParameter->load();
     float lfoAmount = lfoAmountParameter->load();
@@ -303,7 +314,7 @@ void AudioDelayAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer, ju
 
         for (int sample = 0; sample < buffer.getNumSamples(); ++sample)
         {
-            processDelayAndEffects(channel, sample, inputData, wetData, feedback, bitcrushAmount, smearAmount, lfoAmount);
+            processDelayAndEffects(channel, sample, inputData, wetData, feedback, bitcrushAmount, smearAmount, lfoAmount, waveshapeAmount);
         }
     }
 
@@ -470,7 +481,7 @@ void AudioDelayAudioProcessor::applyFiltersToWetSignal(juce::AudioBuffer<float> 
     lowpassFilter.process(wetContext);
 }
 
-void AudioDelayAudioProcessor::processDelayAndEffects(int channel, int sample, const float *inputData, float *wetData, float feedback, float bitcrushAmount, float smearAmount, float lfoAmount)
+void AudioDelayAudioProcessor::processDelayAndEffects(int channel, int sample, const float *inputData, float *wetData, float feedback, float bitcrushAmount, float smearAmount, float lfoAmount, float waveshapeAmount)
 {
     float smoothedLFO = lfoManager.getSample(sample);
 
@@ -501,7 +512,7 @@ void AudioDelayAudioProcessor::processDelayAndEffects(int channel, int sample, c
     // Apply bitcrushing to the delayed signal
     if (modifiedBitcrush < 16.0f)
     {
-        delaySample = applyBitcrushing(delaySample, modifiedBitcrush);
+        delaySample = applyBitcrushing(delaySample, modifiedBitcrush, waveshapeAmount);
     }
 
     // Apply DC blocking filter to the delayed sample
@@ -617,11 +628,17 @@ void AudioDelayAudioProcessor::updateFilterParameters()
     applyLFOToFilters(smoothedLFO, lfoAmount);
 }
 
-float AudioDelayAudioProcessor::applyBitcrushing(float sample, float bitcrushAmount)
+float AudioDelayAudioProcessor::applyBitcrushing(float sample, float bitcrushAmount, float waveshapeAmount)
 {
     int bits = static_cast<int>(bitcrushAmount);
     float maxValue = std::pow(2, bits) - 1;
-    return std::round(sample * maxValue) / maxValue;
+    float crushedSample = std::round(sample * maxValue) / maxValue;
+
+    float shapedSample = waveShaper.processSample(crushedSample);
+    // Mix between crushed and shaped sample
+    // return crushedSample * (1.0f - waveshapeAmount) + shapedSample * waveshapeAmount;
+
+    return shapedSample;
 }
 
 float AudioDelayAudioProcessor::applyLFO(float baseValue, float lfoAmount, float lfoValue, float minValue, float maxValue)
