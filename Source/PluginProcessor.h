@@ -109,7 +109,7 @@ private:
   void processDelayAndEffects(int channel, int sample, const float *inputData, float *wetData, float feedback, float bitcrushAmount, float smearAmount, float lfoAmount);
   float applyLFOToBitcrush(float bitcrushAmount, float lfoAmount, float smoothedLFO);
   void applyLFOToFilters(float smoothedLFO, float lfoAmount);
-  float processDelaySample(int channel, float delayInSamples, float smearAmount);
+  float processDelaySample(int channel, float delayInSamples, float smearAmount, float lfoModulation);
   void updateChorusPhase();
   void applyFiltersToWetSignal(juce::AudioBuffer<float> &wetBuffer);
   void applyStereoWidth(juce::AudioBuffer<float> &wetBuffer, float stereoWidth);

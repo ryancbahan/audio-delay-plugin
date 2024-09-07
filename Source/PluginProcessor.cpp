@@ -196,15 +196,20 @@ void AudioDelayAudioProcessor::updateDiffusionFilters()
 
     for (size_t i = 0; i < 4; ++i)
     {
-        float delayTime = delayTimes[i];
-        float feedback = juce::jlimit(0.0f, 0.4f, feedbackAmounts[i] * smearAmount);
+        float delayTime = juce::jmax(0.00001f, delayTimes[i]);
+        float feedback = juce::jmap(smearAmount, 0.0f, feedbackAmounts[i]);
 
-        float frequency = 1.0f / delayTime;
-        float q = 1.0f / (2.0f * (1.0f - feedback));
+        float frequency = juce::jlimit(20.0f, sampleRate * 0.49f, 1.0f / delayTime);
+        float q = juce::jlimit(0.01f, 100.0f, 1.0f / (2.0f * (1.0f - feedback)));
 
         diffusionFilters[i].setCutoffFrequency(frequency);
         diffusionFilters[i].setResonance(q);
     }
+
+    // Update pre and post diffusion lowpass filters
+    float lowpassFreq = juce::jmap(smearAmount, 20000.0f, 5000.0f);
+    preDiffusionLowpass.setCutoffFrequency(lowpassFreq);
+    postDiffusionLowpass.setCutoffFrequency(lowpassFreq);
 }
 
 float AudioDelayAudioProcessor::processDiffusionFilters(float input)
@@ -483,20 +488,25 @@ float AudioDelayAudioProcessor::applyLFOToBitcrush(float bitcrushAmount, float l
     return bitcrushAmount;
 }
 
-float AudioDelayAudioProcessor::processDelaySample(int channel, float delayInSamples, float smearAmount)
+float AudioDelayAudioProcessor::processDelaySample(int channel, float delayInSamples, float smearAmount, float lfoModulation)
 {
-    float delaySample;
+    // Apply LFO modulation to delay time
+    float lfoModulatedDelay = delayInSamples * (1.0f + lfoModulation);
+
+    // Apply additional chorusing based on smear amount
+    float chorusModulation = chorusDepth * std::sin(chorusPhase) * smearAmount;
+    float totalModulatedDelay = lfoModulatedDelay * (1.0f + chorusModulation);
+
+    // Get the delayed sample
+    float delaySample = delayManager.popSample(channel, totalModulatedDelay);
+
+    // Apply diffusion if smear is active
     if (smearAmount > 0.0f)
     {
-        // Apply chorus modulation to delay time only when smear is active
-        float chorusModulation = chorusDepth * std::sin(chorusPhase) * smearAmount;
-        float modulatedDelaySamples = delayInSamples * (1.0f + chorusModulation);
-        delaySample = delayManager.popSample(channel, modulatedDelaySamples);
+        float diffusedSample = processDiffusionFilters(delaySample);
+        delaySample = juce::jmap(smearAmount, delaySample, diffusedSample);
     }
-    else
-    {
-        delaySample = delayManager.popSample(channel, delayInSamples);
-    }
+
     return delaySample;
 }
 
@@ -538,15 +548,15 @@ void AudioDelayAudioProcessor::processDelayAndEffects(int channel, int sample, c
     // Get the input sample
     float inputSample = inputData[sample];
 
-    // Modulate delay time with LFO for a more pronounced effect
-    float lfoModulatedDelay = applyLFOToDelay(delayInSamples, enhancedLFOAmount, smoothedLFO);
-    float delaySample = processDelaySample(channel, lfoModulatedDelay, smearAmount);
-    // Apply smear (diffusion) to the delayed signal
-    if (smearAmount > 0.0f)
+    // Calculate LFO modulation for delay
+    float lfoModulation = 0.0f;
+    if (lfoDelayParameter->load() > 0.5f)
     {
-        float diffusedSample = processDiffusionFilters(delaySample);
-        delaySample = delaySample * (1.0f - smearAmount) + diffusedSample * smearAmount;
+        lfoModulation = smoothedLFO * enhancedLFOAmount * 0.2f;
     }
+
+    // Process delay sample with both LFO modulation and smear
+    float delaySample = processDelaySample(channel, delayInSamples, smearAmount, lfoModulation);
 
     // Apply bitcrushing to the delayed signal
     if (modifiedBitcrush < 16.0f)
@@ -568,6 +578,7 @@ void AudioDelayAudioProcessor::processDelayAndEffects(int channel, int sample, c
         DBG("Channel " << channel << " - Sample 0:");
         DBG("  Input: " << inputSample << ", Output: " << delaySample);
         DBG("  LFO: " << smoothedLFO << ", Enhanced Amount: " << enhancedLFOAmount);
+        DBG("  Smear Amount: " << smearAmount << ", LFO Modulation: " << lfoModulation);
     }
 }
 
