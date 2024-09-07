@@ -31,7 +31,10 @@ AudioDelayAudioProcessorEditor::AudioDelayAudioProcessorEditor(AudioDelayAudioPr
   setupSwitch(lfoHighpassSwitch, lfoHighpassLabel, "LFO Highpass");
   setupSwitch(lfoLowpassSwitch, lfoLowpassLabel, "LFO Lowpass");
   setupSwitch(lfoPanSwitch, lfoPanLabel, "LFO Pan");
+  setupSwitch(lfoDelaySwitch, lfoDelayLabel, "LFO Delay");
 
+  lfoDelayAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(
+      audioProcessor.getParameters(), "lfoDelay", lfoDelaySwitch);
   lfoBitcrushAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(
       audioProcessor.getParameters(), "lfoBitcrush", lfoBitcrushSwitch);
   lfoHighpassAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(
@@ -57,7 +60,7 @@ AudioDelayAudioProcessorEditor::AudioDelayAudioProcessorEditor(AudioDelayAudioPr
     addAndMakeVisible(label);
   };
 
-  setupKnob(smearKnob, smearLabel, "Smear38", 0.0, 1.0, 0.01);
+  setupKnob(smearKnob, smearLabel, "Smear58", 0.0, 1.0, 0.01);
 
   setupKnob(delayKnob, delayLabel, "Delay", 0.0, 5000.0, 1.0);
   setupKnob(feedbackKnob, feedbackLabel, "Feedback", 0.0, 0.95, 0.01);
@@ -179,31 +182,31 @@ void AudioDelayAudioProcessorEditor::resized()
 {
   auto area = getLocalBounds().reduced(20);
   int width = area.getWidth() / 5;
-  int height = area.getHeight() / 3;
+  int height = area.getHeight() / 4; // Changed from 3 to 4 to add more vertical space
 
   tempoSyncBox.setBounds(width * 0, height * 0, width, 20);
   delayKnob.setBounds(width * 0, height * 0 + 20, width, height - 20);
 
-  // Add LFO Tempo Sync ComboBox layout
   lfoTempoSyncBox.setBounds(width * 3, height * 1, width, 20);
   lfoTempoSyncLabel.setBounds(width * 3, height * 1 + 20, width, 20);
 
-  // Adjust LFO Freq and Amount knob positions
   lfoFreqKnob.setBounds(width * 3, height * 1 + 40, width, height - 60);
   lfoAmountKnob.setBounds(width * 4, height * 1, width, height - 20);
 
-  auto layoutSwitch = [this, width, height](juce::ToggleButton &button, juce::Label &label, int col)
+  auto layoutSwitch = [this, width, height](juce::ToggleButton &button, juce::Label &label, int col, int row)
   {
     int x = width * col;
-    int y = height * 2;
+    int y = height * row;
     button.setBounds(x, y, width, 20);
     label.setBounds(x, y + 20, width, 20);
   };
 
-  layoutSwitch(lfoBitcrushSwitch, lfoBitcrushLabel, 0);
-  layoutSwitch(lfoHighpassSwitch, lfoHighpassLabel, 1);
-  layoutSwitch(lfoLowpassSwitch, lfoLowpassLabel, 2);
-  layoutSwitch(lfoPanSwitch, lfoPanLabel, 3);
+  // Moved switches to the third row (index 2)
+  layoutSwitch(lfoBitcrushSwitch, lfoBitcrushLabel, 0, 2);
+  layoutSwitch(lfoHighpassSwitch, lfoHighpassLabel, 1, 2);
+  layoutSwitch(lfoLowpassSwitch, lfoLowpassLabel, 2, 2);
+  layoutSwitch(lfoPanSwitch, lfoPanLabel, 3, 2);
+  layoutSwitch(lfoDelaySwitch, lfoDelayLabel, 4, 2);
 
   auto layoutKnob = [this, width, height](juce::Slider &knob, juce::Label &label, int row, int col)
   {
@@ -223,13 +226,16 @@ void AudioDelayAudioProcessorEditor::resized()
   layoutKnob(lowpassFreqKnob, lowpassFreqLabel, 1, 2);
   layoutKnob(lfoFreqKnob, lfoFreqLabel, 1, 3);
   layoutKnob(lfoAmountKnob, lfoAmountLabel, 1, 4);
-  layoutKnob(smearKnob, smearLabel, 2, 4);
 
-  // Ensure the switches are visible by setting their bounds directly
-  lfoBitcrushSwitch.setBounds(width * 0, height * 2, width, 20);
-  lfoHighpassSwitch.setBounds(width * 1, height * 2, width, 20);
-  lfoLowpassSwitch.setBounds(width * 2, height * 2, width, 20);
-  lfoPanSwitch.setBounds(width * 3, height * 2, width, 20);
+  // Moved smear knob to the bottom row
+  layoutKnob(smearKnob, smearLabel, 3, 2);
+
+  // Ensure the switches are visible and not overlapped
+  lfoBitcrushSwitch.toFront(false);
+  lfoHighpassSwitch.toFront(false);
+  lfoLowpassSwitch.toFront(false);
+  lfoPanSwitch.toFront(false);
+  lfoDelaySwitch.toFront(false);
 }
 
 void AudioDelayAudioProcessorEditor::setAllLabelsBlack()
@@ -237,7 +243,8 @@ void AudioDelayAudioProcessorEditor::setAllLabelsBlack()
   juce::Label *labels[] = {
       &delayLabel, &feedbackLabel, &mixLabel, &bitcrushLabel, &stereoWidthLabel,
       &panLabel, &highpassFreqLabel, &lowpassFreqLabel, &lfoFreqLabel, &lfoAmountLabel,
-      &smearLabel // Add this line
+      &smearLabel, &lfoBitcrushLabel, &lfoHighpassLabel, &lfoLowpassLabel, &lfoPanLabel,
+      &lfoDelayLabel // Add this line to include the new LFO delay label
   };
 
   for (auto *label : labels)
@@ -251,8 +258,7 @@ void AudioDelayAudioProcessorEditor::setAllKnobsBlack()
   juce::Slider *knobs[] = {
       &delayKnob, &feedbackKnob, &mixKnob, &bitcrushKnob, &stereoWidthKnob,
       &panKnob, &highpassFreqKnob, &lowpassFreqKnob, &lfoFreqKnob, &lfoAmountKnob,
-      &smearKnob // Add this line
-  };
+      &smearKnob};
 
   for (auto *knob : knobs)
   {

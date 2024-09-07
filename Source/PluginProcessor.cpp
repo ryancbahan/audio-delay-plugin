@@ -30,13 +30,14 @@ AudioDelayAudioProcessor::AudioDelayAudioProcessor()
     lfoPanParameter = parameters.getRawParameterValue("lfoPan");
     smearParameter = parameters.getRawParameterValue("smear");
     lfoTempoSyncParameter = parameters.getRawParameterValue("lfoTempoSync");
+    lfoDelayParameter = parameters.getRawParameterValue("lfoDelay");
 
     parameters.addParameterListener("tempoSync", this);
     parameters.addParameterListener("delay", this);
     parameters.addParameterListener("lfoTempoSync", this);
+    parameters.addParameterListener("lfoFreq", this);
 
-    // Initialize the LFO
-    lfoManager.setFrequency(*lfoFreqParameter);
+    // We'll initialize the LFO and delay in prepareToPlay instead of here
 
     DBG("AudioDelayAudioProcessor constructor completed");
 }
@@ -48,6 +49,7 @@ AudioDelayAudioProcessor::~AudioDelayAudioProcessor()
     parameters.removeParameterListener("highpassFreq", this);
     parameters.removeParameterListener("lowpassFreq", this);
     parameters.removeParameterListener("lfoTempoSync", this);
+    parameters.removeParameterListener("lfoFreq", this);
 }
 
 juce::AudioProcessorValueTreeState::ParameterLayout AudioDelayAudioProcessor::createParameterLayout()
@@ -106,6 +108,8 @@ juce::AudioProcessorValueTreeState::ParameterLayout AudioDelayAudioProcessor::cr
     // Smear
     params.push_back(std::make_unique<juce::AudioParameterFloat>("smear", "Smear", 0.0f, 1.0f, 0.0f));
 
+    params.push_back(std::make_unique<juce::AudioParameterBool>("lfoDelay", "LFO Delay", false));
+
     return {params.begin(), params.end()};
 }
 
@@ -134,54 +138,6 @@ void AudioDelayAudioProcessor::updateDelayTimeFromSync()
     delayManager.setDelay(delayInSamples);
 }
 
-const juce::String AudioDelayAudioProcessor::getName() const
-{
-    return JucePlugin_Name;
-}
-
-bool AudioDelayAudioProcessor::acceptsMidi() const
-{
-    return false;
-}
-
-bool AudioDelayAudioProcessor::producesMidi() const
-{
-    return false;
-}
-
-bool AudioDelayAudioProcessor::isMidiEffect() const
-{
-    return false;
-}
-
-double AudioDelayAudioProcessor::getTailLengthSeconds() const
-{
-    return 0.0;
-}
-
-int AudioDelayAudioProcessor::getNumPrograms()
-{
-    return 1;
-}
-
-int AudioDelayAudioProcessor::getCurrentProgram()
-{
-    return 0;
-}
-
-void AudioDelayAudioProcessor::setCurrentProgram(int index)
-{
-}
-
-const juce::String AudioDelayAudioProcessor::getProgramName(int index)
-{
-    return {};
-}
-
-void AudioDelayAudioProcessor::changeProgramName(int index, const juce::String &newName)
-{
-}
-
 void AudioDelayAudioProcessor::updateDiffusionFilters()
 {
     float smearAmount = smearParameter->load();
@@ -192,15 +148,20 @@ void AudioDelayAudioProcessor::updateDiffusionFilters()
 
     for (size_t i = 0; i < 4; ++i)
     {
-        float delayTime = delayTimes[i];
-        float feedback = juce::jlimit(0.0f, 0.4f, feedbackAmounts[i] * smearAmount);
+        float delayTime = juce::jmax(0.00001f, delayTimes[i]);
+        float feedback = juce::jmap(smearAmount, 0.0f, feedbackAmounts[i]);
 
-        float frequency = 1.0f / delayTime;
-        float q = 1.0f / (2.0f * (1.0f - feedback));
+        float frequency = juce::jlimit(20.0f, sampleRate * 0.49f, 1.0f / delayTime);
+        float q = juce::jlimit(0.01f, 100.0f, 1.0f / (2.0f * (1.0f - feedback)));
 
         diffusionFilters[i].setCutoffFrequency(frequency);
         diffusionFilters[i].setResonance(q);
     }
+
+    // Update pre and post diffusion lowpass filters
+    float lowpassFreq = juce::jmap(smearAmount, 20000.0f, 5000.0f);
+    preDiffusionLowpass.setCutoffFrequency(lowpassFreq);
+    postDiffusionLowpass.setCutoffFrequency(lowpassFreq);
 }
 
 float AudioDelayAudioProcessor::processDiffusionFilters(float input)
@@ -213,7 +174,7 @@ float AudioDelayAudioProcessor::processDiffusionFilters(float input)
     {
         // Calculate modulated delay time for chorusing, scaled by smear amount
         float modulation = std::sin(chorusPhase + i * 0.5f) * chorusDepth * smearAmount;
-        float modulatedFrequency = diffusionFilters[i].getCutoffFrequency() * (1.0f + modulation);
+        float modulatedFrequency = juce::jlimit(20.0f, static_cast<float>(getSampleRate()) * 0.49f, diffusionFilters[i].getCutoffFrequency() * (1.0f + modulation));
 
         // Update filter parameters
         diffusionFilters[i].setCutoffFrequency(modulatedFrequency);
@@ -238,7 +199,6 @@ void AudioDelayAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBl
     spec.numChannels = static_cast<juce::uint32>(getTotalNumOutputChannels());
 
     delayManager.prepare(spec);
-    lfoManager.prepare(spec);
     dryWetMixer.prepare(spec);
     panner.prepare(spec);
 
@@ -253,8 +213,8 @@ void AudioDelayAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBl
         filter.prepare(spec);
         filter.setType(juce::dsp::StateVariableTPTFilterType::bandpass);
         filter.setResonance(0.7f);
+        filter.setCutoffFrequency(1000.0f); // Set a default cutoff frequency
     }
-
     preDiffusionLowpass.prepare(spec);
     preDiffusionLowpass.setType(juce::dsp::StateVariableTPTFilterType::lowpass);
     preDiffusionLowpass.setCutoffFrequency(10000.0f);
@@ -281,21 +241,11 @@ void AudioDelayAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBl
     updateDiffusionFilters();
     updateDelayTimeFromSync();
     updateFilterParameters();
-}
 
-void AudioDelayAudioProcessor::releaseResources()
-{
-}
-
-bool AudioDelayAudioProcessor::isBusesLayoutSupported(const BusesLayout &layouts) const
-{
-    if (layouts.getMainOutputChannelSet() != juce::AudioChannelSet::mono() && layouts.getMainOutputChannelSet() != juce::AudioChannelSet::stereo())
-        return false;
-
-    if (layouts.getMainOutputChannelSet() != layouts.getMainInputChannelSet())
-        return false;
-
-    return true;
+    // Initialize the delay time after the delayManager has been prepared
+    float delayTime = delayParameter->load();
+    float delayInSamples = delayTime / 1000.0f * sampleRate;
+    delayManager.setDelay(delayInSamples);
 }
 
 void AudioDelayAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer, juce::MidiBuffer &midiMessages)
@@ -304,13 +254,25 @@ void AudioDelayAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer, ju
     auto totalNumInputChannels = getTotalNumInputChannels();
     auto totalNumOutputChannels = getTotalNumOutputChannels();
 
-    lfoManager.setFrequency(lfoFreqParameter->load());
+    DBG("-------- processBlock start --------");
+    DBG("Buffer size: " << buffer.getNumSamples() << ", Input channels: " << totalNumInputChannels << ", Output channels: " << totalNumOutputChannels);
+
+    float currentLFOFreq = lfoFreqParameter->load();
+    DBG("Current LFO Frequency: " << currentLFOFreq << " Hz");
+
+    lfoManager.setFrequency(currentLFOFreq);
+    lfoManager.generateBlock(buffer.getNumSamples());
+
+    DBG("LFO block generated. Checking samples:");
+    DBG("First LFO sample: " << lfoManager.getSample(0));
+    DBG("Middle LFO sample: " << lfoManager.getSample(buffer.getNumSamples() / 2));
+    DBG("Last LFO sample: " << lfoManager.getSample(buffer.getNumSamples() - 1));
 
     // Clear any output channels that don't contain input data
     for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
         buffer.clear(i, 0, buffer.getNumSamples());
 
-    // Update BPM if changed
+    DBG("Updating BPM if changed");
     updateBPMIfChanged();
 
     // Prepare dry and wet buffers
@@ -326,9 +288,13 @@ void AudioDelayAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer, ju
     float lfoAmount = lfoAmountParameter->load();
     float smearAmount = smearParameter->load();
 
-    // Update diffusion filters
+    DBG("Current parameters - Feedback: " << feedback << ", Mix: " << mix << ", Bitcrush: " << bitcrushAmount
+                                          << ", Stereo Width: " << stereoWidth << ", Pan: " << pan << ", LFO Amount: " << lfoAmount << ", Smear: " << smearAmount);
+
+    DBG("Updating diffusion filters");
     updateDiffusionFilters();
 
+    DBG("Processing delay and effects");
     // Process delay and apply effects
     for (int channel = 0; channel < totalNumInputChannels; ++channel)
     {
@@ -341,37 +307,39 @@ void AudioDelayAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer, ju
         }
     }
 
-    // Apply filters to the wet signal
+    DBG("Applying filters to wet signal");
     applyFiltersToWetSignal(wetBuffer);
 
-    // Apply stereo width to wet signal
+    DBG("Applying stereo width");
     applyStereoWidth(wetBuffer, stereoWidth);
 
-    // Apply panning to wet signal
+    DBG("Applying panning");
     applyPanning(wetBuffer, pan, lfoAmount);
 
-    // Mix dry and wet signals
+    DBG("Mixing dry and wet signals");
     mixDryWetSignals(buffer, dryBuffer, wetBuffer, mix);
 
-    // Apply final DC blocking
+    DBG("Applying final DC blocking");
     applyFinalDCBlocking(buffer);
 
     juce::ignoreUnused(midiMessages);
+
+    DBG("-------- processBlock end --------");
 }
 
 void AudioDelayAudioProcessor::applyPanning(juce::AudioBuffer<float> &buffer, float pan, float lfoAmount)
 {
-    float modifiedPan = pan;
-    if (lfoPanParameter->load() > 0.5f)
-    {
-        modifiedPan = applyLFOToPan(pan, lfoAmount, lfoManager.getNextSample());
-    }
-
-    float leftGain = 1.0f - modifiedPan;
-    float rightGain = 1.0f + modifiedPan;
-
     for (int sample = 0; sample < buffer.getNumSamples(); ++sample)
     {
+        float modifiedPan = pan;
+        if (lfoPanParameter->load() > 0.5f)
+        {
+            modifiedPan = applyLFOToPan(pan, lfoAmount, lfoManager.getSample(sample));
+        }
+
+        float leftGain = 1.0f - modifiedPan;
+        float rightGain = 1.0f + modifiedPan;
+
         buffer.setSample(0, sample, buffer.getSample(0, sample) * leftGain);
         buffer.setSample(1, sample, buffer.getSample(1, sample) * rightGain);
     }
@@ -419,7 +387,8 @@ void AudioDelayAudioProcessor::applyLFOToFilters(float smoothedLFO, float lfoAmo
 
     if (lfoHighpassParameter->load() > 0.5f)
     {
-        float highpassModDepth = juce::jmap(lfoAmount, 0.5f, 4.0f);
+        // Increase the modulation range for highpass
+        float highpassModDepth = juce::jmap(lfoAmount, 0.5f, 6.0f);
         modifiedHighpassFreq = juce::jlimit(
             20.0f,
             5000.0f,
@@ -428,7 +397,8 @@ void AudioDelayAudioProcessor::applyLFOToFilters(float smoothedLFO, float lfoAmo
 
     if (lfoLowpassParameter->load() > 0.5f)
     {
-        float lowpassModDepth = juce::jmap(lfoAmount, 0.5f, 2.0f);
+        // Increase the modulation range for lowpass
+        float lowpassModDepth = juce::jmap(lfoAmount, 0.5f, 4.0f);
         modifiedLowpassFreq = juce::jlimit(
             200.0f,
             20000.0f,
@@ -455,20 +425,25 @@ float AudioDelayAudioProcessor::applyLFOToBitcrush(float bitcrushAmount, float l
     return bitcrushAmount;
 }
 
-float AudioDelayAudioProcessor::processDelaySample(int channel, float delayInSamples, float smearAmount)
+float AudioDelayAudioProcessor::processDelaySample(int channel, float delayInSamples, float smearAmount, float lfoModulation)
 {
-    float delaySample;
+    // Apply LFO modulation to delay time
+    float lfoModulatedDelay = delayInSamples * (1.0f + lfoModulation);
+
+    // Apply additional chorusing based on smear amount
+    float chorusModulation = chorusDepth * std::sin(chorusPhase) * smearAmount;
+    float totalModulatedDelay = lfoModulatedDelay * (1.0f + chorusModulation);
+
+    // Get the delayed sample
+    float delaySample = delayManager.popSample(channel, totalModulatedDelay);
+
+    // Apply diffusion if smear is active
     if (smearAmount > 0.0f)
     {
-        // Apply chorus modulation to delay time only when smear is active
-        float chorusModulation = chorusDepth * std::sin(chorusPhase) * smearAmount;
-        float modulatedDelaySamples = delayInSamples * (1.0f + chorusModulation);
-        delaySample = delayManager.popSample(channel, modulatedDelaySamples);
+        float diffusedSample = processDiffusionFilters(delaySample);
+        delaySample = juce::jmap(smearAmount, delaySample, diffusedSample);
     }
-    else
-    {
-        delaySample = delayManager.popSample(channel, delayInSamples);
-    }
+
     return delaySample;
 }
 
@@ -494,23 +469,31 @@ void AudioDelayAudioProcessor::applyFiltersToWetSignal(juce::AudioBuffer<float> 
 
 void AudioDelayAudioProcessor::processDelayAndEffects(int channel, int sample, const float *inputData, float *wetData, float feedback, float bitcrushAmount, float smearAmount, float lfoAmount)
 {
-    float smoothedLFO = lfoManager.getNextSample();
+    float smoothedLFO = lfoManager.getSample(sample);
 
-    float modifiedBitcrush = applyLFOToBitcrush(bitcrushAmount, lfoAmount, smoothedLFO);
-    applyLFOToFilters(smoothedLFO, lfoAmount);
+    // Apply a global LFO depth control
+    float globalLFODepth = 1.5f; // Adjust this value to increase overall LFO impact
+    float enhancedLFOAmount = lfoAmount * globalLFODepth;
+
+    applyLFOToFilters(smoothedLFO, enhancedLFOAmount);
+
+    float modifiedBitcrush = applyLFOToBitcrush(bitcrushAmount, enhancedLFOAmount, smoothedLFO);
 
     float delayTime = delayParameter->load();
     float delayInSamples = delayTime / 1000.0f * getSampleRate();
+
+    // Get the input sample
     float inputSample = inputData[sample];
 
-    float delaySample = processDelaySample(channel, delayInSamples, smearAmount);
-
-    // Apply smear (diffusion) to the delayed signal
-    if (smearAmount > 0.0f)
+    // Calculate LFO modulation for delay
+    float lfoModulation = 0.0f;
+    if (lfoDelayParameter->load() > 0.5f)
     {
-        float diffusedSample = processDiffusionFilters(delaySample);
-        delaySample = delaySample * (1.0f - smearAmount) + diffusedSample * smearAmount;
+        lfoModulation = smoothedLFO * enhancedLFOAmount * 0.2f;
     }
+
+    // Process delay sample with both LFO modulation and smear
+    float delaySample = processDelaySample(channel, delayInSamples, smearAmount, lfoModulation);
 
     // Apply bitcrushing to the delayed signal
     if (modifiedBitcrush < 16.0f)
@@ -524,33 +507,16 @@ void AudioDelayAudioProcessor::processDelayAndEffects(int channel, int sample, c
     delayManager.pushSample(channel, inputSample + (delaySample * feedback));
     wetData[sample] = delaySample;
 
-    // Update chorus phase
     updateChorusPhase();
-}
 
-bool AudioDelayAudioProcessor::hasEditor() const
-{
-    return true;
-}
-
-juce::AudioProcessorEditor *AudioDelayAudioProcessor::createEditor()
-{
-    return new AudioDelayAudioProcessorEditor(*this);
-}
-
-void AudioDelayAudioProcessor::getStateInformation(juce::MemoryBlock &destData)
-{
-    auto state = parameters.copyState();
-    std::unique_ptr<juce::XmlElement> xml(state.createXml());
-    copyXmlToBinary(*xml, destData);
-}
-
-void AudioDelayAudioProcessor::setStateInformation(const void *data, int sizeInBytes)
-{
-    std::unique_ptr<juce::XmlElement> xmlState(getXmlFromBinary(data, sizeInBytes));
-    if (xmlState.get() != nullptr)
-        if (xmlState->hasTagName(parameters.state.getType()))
-            parameters.replaceState(juce::ValueTree::fromXml(*xmlState));
+    // Debug output (if needed)
+    if (sample == 0)
+    {
+        DBG("Channel " << channel << " - Sample 0:");
+        DBG("  Input: " << inputSample << ", Output: " << delaySample);
+        DBG("  LFO: " << smoothedLFO << ", Enhanced Amount: " << enhancedLFOAmount);
+        DBG("  Smear Amount: " << smearAmount << ", LFO Modulation: " << lfoModulation);
+    }
 }
 
 void AudioDelayAudioProcessor::parameterChanged(const juce::String &parameterID, float newValue)
@@ -576,6 +542,7 @@ void AudioDelayAudioProcessor::parameterChanged(const juce::String &parameterID,
     else if (parameterID == "lfoFreq")
     {
         lfoManager.setFrequency(newValue);
+        updateLFOFrequency();
     }
     else if (parameterID == "highpassFreq" || parameterID == "lowpassFreq" ||
              parameterID == "lfoHighpass" || parameterID == "lfoLowpass" ||
@@ -587,8 +554,8 @@ void AudioDelayAudioProcessor::parameterChanged(const juce::String &parameterID,
 
 void AudioDelayAudioProcessor::updateLFOFrequency()
 {
+    DBG("updating lfo freq");
     int syncMode = static_cast<int>(lfoTempoSyncParameter->load());
-    float currentFreq = lfoFreqParameter->load();
 
     if (syncMode != 0) // Not in Free mode
     {
@@ -639,7 +606,11 @@ void AudioDelayAudioProcessor::timerCallback()
 void AudioDelayAudioProcessor::updateFilterParameters()
 {
     float lfoAmount = lfoAmountParameter->load();
-    float smoothedLFO = lfoManager.getNextSample();
+
+    // We can't use a specific sample index here, so we'll use the middle of the buffer
+    int middleSample = lfoManager.getBufferSize() / 2;
+    float smoothedLFO = lfoManager.getSample(middleSample);
+
     applyLFOToFilters(smoothedLFO, lfoAmount);
 }
 
@@ -659,12 +630,109 @@ float AudioDelayAudioProcessor::applyLFO(float baseValue, float lfoAmount, float
 
 float AudioDelayAudioProcessor::applyLFOToPan(float basePan, float lfoAmount, float lfoValue)
 {
-    float modulation = lfoValue * lfoAmount;
+    float modulation = lfoValue * lfoAmount * 1.5f;
     float modifiedPan = basePan + modulation;
     return juce::jlimit(-1.0f, 1.0f, modifiedPan);
+}
+
+float AudioDelayAudioProcessor::applyLFOToDelay(float delayInSamples, float lfoAmount, float smoothedLFO)
+{
+    if (lfoDelayParameter->load() > 0.5f)
+    {
+        return delayInSamples * (1.0f + smoothedLFO * lfoAmount * 0.2f);
+    }
+    return delayInSamples;
 }
 
 juce::AudioProcessor *JUCE_CALLTYPE createPluginFilter()
 {
     return new AudioDelayAudioProcessor();
+}
+
+const juce::String AudioDelayAudioProcessor::getName() const
+{
+    return JucePlugin_Name;
+}
+
+bool AudioDelayAudioProcessor::acceptsMidi() const
+{
+    return false;
+}
+
+bool AudioDelayAudioProcessor::producesMidi() const
+{
+    return false;
+}
+
+bool AudioDelayAudioProcessor::isMidiEffect() const
+{
+    return false;
+}
+
+double AudioDelayAudioProcessor::getTailLengthSeconds() const
+{
+    return 0.0;
+}
+
+int AudioDelayAudioProcessor::getNumPrograms()
+{
+    return 1;
+}
+
+int AudioDelayAudioProcessor::getCurrentProgram()
+{
+    return 0;
+}
+
+void AudioDelayAudioProcessor::setCurrentProgram(int index)
+{
+}
+
+const juce::String AudioDelayAudioProcessor::getProgramName(int index)
+{
+    return {};
+}
+
+void AudioDelayAudioProcessor::changeProgramName(int index, const juce::String &newName)
+{
+}
+
+bool AudioDelayAudioProcessor::hasEditor() const
+{
+    return true;
+}
+
+juce::AudioProcessorEditor *AudioDelayAudioProcessor::createEditor()
+{
+    return new AudioDelayAudioProcessorEditor(*this);
+}
+
+void AudioDelayAudioProcessor::getStateInformation(juce::MemoryBlock &destData)
+{
+    auto state = parameters.copyState();
+    std::unique_ptr<juce::XmlElement> xml(state.createXml());
+    copyXmlToBinary(*xml, destData);
+}
+
+void AudioDelayAudioProcessor::setStateInformation(const void *data, int sizeInBytes)
+{
+    std::unique_ptr<juce::XmlElement> xmlState(getXmlFromBinary(data, sizeInBytes));
+    if (xmlState.get() != nullptr)
+        if (xmlState->hasTagName(parameters.state.getType()))
+            parameters.replaceState(juce::ValueTree::fromXml(*xmlState));
+}
+
+void AudioDelayAudioProcessor::releaseResources()
+{
+}
+
+bool AudioDelayAudioProcessor::isBusesLayoutSupported(const BusesLayout &layouts) const
+{
+    if (layouts.getMainOutputChannelSet() != juce::AudioChannelSet::mono() && layouts.getMainOutputChannelSet() != juce::AudioChannelSet::stereo())
+        return false;
+
+    if (layouts.getMainOutputChannelSet() != layouts.getMainInputChannelSet())
+        return false;
+
+    return true;
 }

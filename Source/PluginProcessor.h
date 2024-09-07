@@ -109,7 +109,7 @@ private:
   void processDelayAndEffects(int channel, int sample, const float *inputData, float *wetData, float feedback, float bitcrushAmount, float smearAmount, float lfoAmount);
   float applyLFOToBitcrush(float bitcrushAmount, float lfoAmount, float smoothedLFO);
   void applyLFOToFilters(float smoothedLFO, float lfoAmount);
-  float processDelaySample(int channel, float delayInSamples, float smearAmount);
+  float processDelaySample(int channel, float delayInSamples, float smearAmount, float lfoModulation);
   void updateChorusPhase();
   void applyFiltersToWetSignal(juce::AudioBuffer<float> &wetBuffer);
   void applyStereoWidth(juce::AudioBuffer<float> &wetBuffer, float stereoWidth);
@@ -123,6 +123,8 @@ private:
   float applyLFO(float baseValue, float lfoAmount, float lfoValue, float minValue, float maxValue);
   float applyLFOToPan(float basePan, float lfoAmount, float lfoValue);
   void updateDelayTimeFromSync();
+  std::atomic<float> *lfoDelayParameter = nullptr;
+  float applyLFOToDelay(float delayInSamples, float lfoAmount, float smoothedLFO);
 
   JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AudioDelayAudioProcessor)
 };

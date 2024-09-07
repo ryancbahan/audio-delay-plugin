@@ -24,6 +24,7 @@ private:
   juce::ToggleButton lfoHighpassSwitch;
   juce::ToggleButton lfoLowpassSwitch;
   juce::ToggleButton lfoPanSwitch;
+  juce::ToggleButton lfoDelaySwitch;
 
   juce::Slider delayKnob;
   juce::Slider feedbackKnob;
@@ -56,6 +57,7 @@ private:
   juce::Label lfoHighpassLabel;
   juce::Label lfoLowpassLabel;
   juce::Label lfoPanLabel;
+  juce::Label lfoDelayLabel;
 
   juce::Slider smearKnob;
   juce::Label smearLabel;
@@ -77,6 +79,7 @@ private:
   std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> lfoFreqAttachment;
   std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> lfoAmountAttachment;
   std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> tempoSyncAttachment;
+  std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> lfoDelayAttachment; // New attachment for LFO delay
 
   JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AudioDelayAudioProcessorEditor)
 };

@@ -1,7 +1,7 @@
 #include "LFOManager.h"
 
 LFOManager::LFOManager()
-    : lastKnownBPM(120.0f)
+    : lastKnownBPM(120.0f), sampleRate(44100.0f)
 {
     lfo.initialise([](float x)
                    { return std::sin(x); });
@@ -9,17 +9,55 @@ LFOManager::LFOManager()
 
 void LFOManager::prepare(const juce::dsp::ProcessSpec &spec)
 {
+    sampleRate = static_cast<float>(spec.sampleRate);
     lfo.prepare(spec);
+    smoother.reset(sampleRate, 0.05f); // 50ms smoothing time
+    isReady = true;
+    DBG("LFOManager prepared. isReady set to true.");
 }
 
 void LFOManager::setFrequency(float frequency)
 {
+    DBG("Setting LFO frequency to " << frequency);
     lfo.setFrequency(frequency);
 }
 
-float LFOManager::getNextSample()
+void LFOManager::generateBlock(int numSamples)
 {
-    return lfo.processSample(0.0f);
+    DBG("generateBlock called with numSamples: " << numSamples);
+    if (!isReady)
+    {
+        DBG("LFOManager not ready. Returning without generating.");
+        return;
+    }
+
+    DBG("Resizing lfoBuffer to " << numSamples << " samples");
+    lfoBuffer.resize(numSamples);
+    for (int i = 0; i < numSamples; ++i)
+    {
+        float sample = lfo.processSample(0.0f);
+        smoother.setTargetValue(sample);
+        sample = smoother.getNextValue();
+        lfoBuffer[i] = sample * 0.5f + 0.5f; // Convert from [-1, 1] to [0, 1] range
+    }
+
+    DBG("LFO Buffer generated. Size: " << lfoBuffer.size() << ", First: " << lfoBuffer.front() << ", Last: " << lfoBuffer.back());
+}
+
+float LFOManager::getSample(int index) const
+{
+    DBG("getSample called with index: " << index << ", buffer size: " << lfoBuffer.size());
+    if (!isReady)
+    {
+        DBG("LFOManager not ready");
+        return 0.0f;
+    }
+    if (index < 0 || index >= static_cast<int>(lfoBuffer.size()))
+    {
+        DBG("Invalid index");
+        return 0.0f;
+    }
+    return lfoBuffer[index];
 }
 
 float LFOManager::updateFrequencyFromSync(float bpm, int syncMode)
@@ -90,5 +128,6 @@ float LFOManager::updateFrequencyFromSync(float bpm, int syncMode)
     }
 
     lfoFreq = juce::jlimit(0.01f, 20.0f, lfoFreq);
+    lfo.setFrequency(lfoFreq);
     return lfoFreq;
 }
