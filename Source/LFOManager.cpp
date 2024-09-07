@@ -1,7 +1,7 @@
 #include "LFOManager.h"
 
 LFOManager::LFOManager()
-    : lastKnownBPM(120.0f)
+    : lastKnownBPM(120.0f), sampleRate(44100.0f)
 {
     lfo.initialise([](float x)
                    { return std::sin(x); });
@@ -9,7 +9,9 @@ LFOManager::LFOManager()
 
 void LFOManager::prepare(const juce::dsp::ProcessSpec &spec)
 {
+    sampleRate = static_cast<float>(spec.sampleRate);
     lfo.prepare(spec);
+    smoother.reset(sampleRate, 0.05f); // 50ms smoothing time
 }
 
 void LFOManager::setFrequency(float frequency)
@@ -17,9 +19,26 @@ void LFOManager::setFrequency(float frequency)
     lfo.setFrequency(frequency);
 }
 
-float LFOManager::getNextSample()
+void LFOManager::generateBlock(int numSamples)
 {
-    return lfo.processSample(0.0f);
+    if (!isReady)
+        return;
+
+    lfoBuffer.resize(numSamples);
+    for (int i = 0; i < numSamples; ++i)
+    {
+        float sample = lfo.processSample(0.0f);
+        smoother.setTargetValue(sample);
+        sample = smoother.getNextValue();
+        lfoBuffer[i] = sample * 0.5f + 0.5f; // Convert from [-1, 1] to [0, 1] range
+    }
+}
+
+float LFOManager::getSample(int index) const
+{
+    if (!isReady || index < 0 || index >= static_cast<int>(lfoBuffer.size()))
+        return 0.0f;
+    return lfoBuffer[index];
 }
 
 float LFOManager::updateFrequencyFromSync(float bpm, int syncMode)

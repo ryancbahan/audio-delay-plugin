@@ -35,8 +35,7 @@ AudioDelayAudioProcessor::AudioDelayAudioProcessor()
     parameters.addParameterListener("delay", this);
     parameters.addParameterListener("lfoTempoSync", this);
 
-    // Initialize the LFO
-    lfoManager.setFrequency(*lfoFreqParameter);
+    // We'll initialize the LFO and delay in prepareToPlay instead of here
 
     DBG("AudioDelayAudioProcessor constructor completed");
 }
@@ -238,7 +237,6 @@ void AudioDelayAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBl
     spec.numChannels = static_cast<juce::uint32>(getTotalNumOutputChannels());
 
     delayManager.prepare(spec);
-    lfoManager.prepare(spec);
     dryWetMixer.prepare(spec);
     panner.prepare(spec);
 
@@ -281,6 +279,11 @@ void AudioDelayAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBl
     updateDiffusionFilters();
     updateDelayTimeFromSync();
     updateFilterParameters();
+
+    // Initialize the delay time after the delayManager has been prepared
+    float delayTime = delayParameter->load();
+    float delayInSamples = delayTime / 1000.0f * sampleRate;
+    delayManager.setDelay(delayInSamples);
 }
 
 void AudioDelayAudioProcessor::releaseResources()
@@ -305,6 +308,7 @@ void AudioDelayAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer, ju
     auto totalNumOutputChannels = getTotalNumOutputChannels();
 
     lfoManager.setFrequency(lfoFreqParameter->load());
+    lfoManager.generateBlock(buffer.getNumSamples());
 
     // Clear any output channels that don't contain input data
     for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
@@ -361,17 +365,17 @@ void AudioDelayAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer, ju
 
 void AudioDelayAudioProcessor::applyPanning(juce::AudioBuffer<float> &buffer, float pan, float lfoAmount)
 {
-    float modifiedPan = pan;
-    if (lfoPanParameter->load() > 0.5f)
-    {
-        modifiedPan = applyLFOToPan(pan, lfoAmount, lfoManager.getNextSample());
-    }
-
-    float leftGain = 1.0f - modifiedPan;
-    float rightGain = 1.0f + modifiedPan;
-
     for (int sample = 0; sample < buffer.getNumSamples(); ++sample)
     {
+        float modifiedPan = pan;
+        if (lfoPanParameter->load() > 0.5f)
+        {
+            modifiedPan = applyLFOToPan(pan, lfoAmount, lfoManager.getSample(sample));
+        }
+
+        float leftGain = 1.0f - modifiedPan;
+        float rightGain = 1.0f + modifiedPan;
+
         buffer.setSample(0, sample, buffer.getSample(0, sample) * leftGain);
         buffer.setSample(1, sample, buffer.getSample(1, sample) * rightGain);
     }
@@ -494,10 +498,10 @@ void AudioDelayAudioProcessor::applyFiltersToWetSignal(juce::AudioBuffer<float> 
 
 void AudioDelayAudioProcessor::processDelayAndEffects(int channel, int sample, const float *inputData, float *wetData, float feedback, float bitcrushAmount, float smearAmount, float lfoAmount)
 {
-    float smoothedLFO = lfoManager.getNextSample();
+    float smoothedLFO = lfoManager.getSample(sample);
+    applyLFOToFilters(smoothedLFO, lfoAmount);
 
     float modifiedBitcrush = applyLFOToBitcrush(bitcrushAmount, lfoAmount, smoothedLFO);
-    applyLFOToFilters(smoothedLFO, lfoAmount);
 
     float delayTime = delayParameter->load();
     float delayInSamples = delayTime / 1000.0f * getSampleRate();
@@ -639,7 +643,11 @@ void AudioDelayAudioProcessor::timerCallback()
 void AudioDelayAudioProcessor::updateFilterParameters()
 {
     float lfoAmount = lfoAmountParameter->load();
-    float smoothedLFO = lfoManager.getNextSample();
+
+    // We can't use a specific sample index here, so we'll use the middle of the buffer
+    int middleSample = lfoManager.getBufferSize() / 2;
+    float smoothedLFO = lfoManager.getSample(middleSample);
+
     applyLFOToFilters(smoothedLFO, lfoAmount);
 }
 
