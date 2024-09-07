@@ -43,9 +43,6 @@ AudioDelayAudioProcessor::AudioDelayAudioProcessor()
         return juce::jlimit(float(-0.1), float(0.1), x); // [6]
     };
 
-    // createImpulseResponse();
-    // We'll initialize the LFO and delay in prepareToPlay instead of here
-
     DBG("AudioDelayAudioProcessor constructor completed");
 }
 
@@ -58,22 +55,6 @@ AudioDelayAudioProcessor::~AudioDelayAudioProcessor()
     parameters.removeParameterListener("lfoTempoSync", this);
     parameters.removeParameterListener("lfoFreq", this);
 }
-
-// void AudioDelayAudioProcessor::createImpulseResponse()
-// {
-//     // Create a simple impulse response (you can experiment with different shapes)
-//     impulseResponse.setSize(1, 512);
-//     impulseResponse.clear();
-//     float *data = impulseResponse.getWritePointer(0);
-//     for (int i = 0; i < 512; ++i)
-//     {
-//         data[i] = std::exp(-i / 50.0f) * std::sin(i * 0.1f);
-//     }
-//     convolution.loadImpulseResponse(std::move(impulseResponse),
-//                                     juce::dsp::Convolution::Stereo::no,
-//                                     juce::dsp::Convolution::Trim::no,
-//                                     0);
-// }
 
 juce::AudioProcessorValueTreeState::ParameterLayout AudioDelayAudioProcessor::createParameterLayout()
 {
@@ -198,7 +179,7 @@ float AudioDelayAudioProcessor::processDiffusionFilters(float input)
     for (size_t i = 0; i < diffusionFilters.size(); ++i)
     {
         // Calculate modulated delay time for chorusing, scaled by smear amount
-        float modulation = std::sin(chorusPhase + i * 0.5f) * chorusDepth * smearAmount;
+        float modulation = std::sin(chorusPhase + i * 1.0f) * chorusDepth * smearAmount;
         float modulatedFrequency = juce::jlimit(20.0f, static_cast<float>(getSampleRate()) * 0.49f, diffusionFilters[i].getCutoffFrequency() * (1.0f + modulation));
 
         // Update filter parameters
