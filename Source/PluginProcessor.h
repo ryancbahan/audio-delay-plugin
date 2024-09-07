@@ -123,6 +123,8 @@ private:
   float applyLFO(float baseValue, float lfoAmount, float lfoValue, float minValue, float maxValue);
   float applyLFOToPan(float basePan, float lfoAmount, float lfoValue);
   void updateDelayTimeFromSync();
+  std::atomic<float> *lfoDelayParameter = nullptr;
+  float applyLFOToDelay(float delayInSamples, float lfoAmount, float smoothedLFO);
 
   JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AudioDelayAudioProcessor)
 };
