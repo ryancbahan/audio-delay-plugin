@@ -68,6 +68,15 @@ private:
   juce::dsp::DryWetMixer<float> dryWetMixer;
   juce::dsp::Panner<float> panner;
 
+  juce::dsp::Convolution convolution;
+  juce::AudioBuffer<float> impulseResponse;
+  juce::dsp::WaveShaper<float> waveShaper;
+
+  void createImpulseResponse();
+  float customWaveshaper(float sample);
+
+  std::atomic<float> *waveshapeAmountParameter = nullptr;
+
   juce::dsp::ProcessorDuplicator<juce::dsp::IIR::Filter<float>, juce::dsp::IIR::Coefficients<float>> highpassFilter;
   juce::dsp::ProcessorDuplicator<juce::dsp::IIR::Filter<float>, juce::dsp::IIR::Coefficients<float>> lowpassFilter;
 
@@ -106,7 +115,7 @@ private:
   juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
   void updateLFOFrequency();
   void updateBPMIfChanged();
-  void processDelayAndEffects(int channel, int sample, const float *inputData, float *wetData, float feedback, float bitcrushAmount, float smearAmount, float lfoAmount);
+  void processDelayAndEffects(int channel, int sample, const float *inputData, float *wetData, float feedback, float bitcrushAmount, float smearAmount, float lfoAmount, float waveshapeAmount);
   float applyLFOToBitcrush(float bitcrushAmount, float lfoAmount, float smoothedLFO);
   void applyLFOToFilters(float smoothedLFO, float lfoAmount);
   float processDelaySample(int channel, float delayInSamples, float smearAmount, float lfoModulation);
@@ -119,7 +128,7 @@ private:
   void updateFilterParameters();
   void updateDiffusionFilters();
   float processDiffusionFilters(float input);
-  float applyBitcrushing(float sample, float bitcrushAmount);
+  float applyBitcrushing(float sample, float bitcrushAmount, float waveshapeAmount);
   float applyLFO(float baseValue, float lfoAmount, float lfoValue, float minValue, float maxValue);
   float applyLFOToPan(float basePan, float lfoAmount, float lfoValue);
   void updateDelayTimeFromSync();
