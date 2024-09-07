@@ -60,7 +60,7 @@ AudioDelayAudioProcessorEditor::AudioDelayAudioProcessorEditor(AudioDelayAudioPr
     addAndMakeVisible(label);
   };
 
-  setupKnob(smearKnob, smearLabel, "Smear56", 0.0, 1.0, 0.01);
+  setupKnob(smearKnob, smearLabel, "Smear57", 0.0, 1.0, 0.01);
 
   setupKnob(delayKnob, delayLabel, "Delay", 0.0, 5000.0, 1.0);
   setupKnob(feedbackKnob, feedbackLabel, "Feedback", 0.0, 0.95, 0.01);

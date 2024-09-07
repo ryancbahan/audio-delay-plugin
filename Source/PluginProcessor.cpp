@@ -217,7 +217,7 @@ float AudioDelayAudioProcessor::processDiffusionFilters(float input)
     {
         // Calculate modulated delay time for chorusing, scaled by smear amount
         float modulation = std::sin(chorusPhase + i * 0.5f) * chorusDepth * smearAmount;
-        float modulatedFrequency = diffusionFilters[i].getCutoffFrequency() * (1.0f + modulation);
+        float modulatedFrequency = juce::jlimit(20.0f, static_cast<float>(getSampleRate()) * 0.49f, diffusionFilters[i].getCutoffFrequency() * (1.0f + modulation));
 
         // Update filter parameters
         diffusionFilters[i].setCutoffFrequency(modulatedFrequency);
@@ -256,8 +256,8 @@ void AudioDelayAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBl
         filter.prepare(spec);
         filter.setType(juce::dsp::StateVariableTPTFilterType::bandpass);
         filter.setResonance(0.7f);
+        filter.setCutoffFrequency(1000.0f); // Set a default cutoff frequency
     }
-
     preDiffusionLowpass.prepare(spec);
     preDiffusionLowpass.setType(juce::dsp::StateVariableTPTFilterType::lowpass);
     preDiffusionLowpass.setCutoffFrequency(10000.0f);
