@@ -331,14 +331,17 @@ void AudioDelayAudioProcessor::applyPanning(juce::AudioBuffer<float> &buffer, fl
 {
     for (int sample = 0; sample < buffer.getNumSamples(); ++sample)
     {
+        float lfoValue = lfoManager.getSample(sample);
         float modifiedPan = pan;
+
         if (lfoPanParameter->load() > 0.5f)
         {
-            modifiedPan = applyLFOToPan(pan, lfoAmount, lfoManager.getSample(sample));
+            modifiedPan = applyLFOToPan(pan, lfoAmount, lfoValue);
         }
 
-        float leftGain = 1.0f - modifiedPan;
-        float rightGain = 1.0f + modifiedPan;
+        // Convert pan [-1, 1] to gain [0, 1] for each channel
+        float leftGain = 0.5f * (1.0f - modifiedPan);
+        float rightGain = 0.5f * (1.0f + modifiedPan);
 
         buffer.setSample(0, sample, buffer.getSample(0, sample) * leftGain);
         buffer.setSample(1, sample, buffer.getSample(1, sample) * rightGain);
@@ -630,8 +633,18 @@ float AudioDelayAudioProcessor::applyLFO(float baseValue, float lfoAmount, float
 
 float AudioDelayAudioProcessor::applyLFOToPan(float basePan, float lfoAmount, float lfoValue)
 {
-    float modulation = lfoValue * lfoAmount * 1.5f;
-    float modifiedPan = basePan + modulation;
+    // Assume lfoValue is in the range [0, 1]
+    // Convert it to the range [-1, 1]
+    float bipolarLFO = 2.0f * lfoValue - 1.0f;
+
+    // Calculate the modulation, scaling it by lfoAmount
+    float modulation = bipolarLFO * lfoAmount;
+
+    // Apply the modulation to the base pan
+    // This ensures that when basePan is 0 (center), the LFO modulates equally in both directions
+    float modifiedPan = basePan + (1.0f - std::abs(basePan)) * modulation;
+
+    // Limit the result to the valid range [-1, 1]
     return juce::jlimit(-1.0f, 1.0f, modifiedPan);
 }
 
