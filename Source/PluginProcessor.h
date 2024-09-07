@@ -14,6 +14,8 @@ public:
   AudioDelayAudioProcessor();
   ~AudioDelayAudioProcessor() override;
 
+  juce::dsp::IIR::Filter<float> chorusLowpass;
+
   void prepareToPlay(double sampleRate, int samplesPerBlock) override;
   void releaseResources() override;
   bool isBusesLayoutSupported(const BusesLayout &layouts) const override;
@@ -75,6 +77,8 @@ private:
   void createImpulseResponse();
   float customWaveshaper(float sample);
 
+  juce::dsp::DelayLine<float, juce::dsp::DelayLineInterpolationTypes::Linear> chorusDelayLine;
+
   std::atomic<float> *waveshapeAmountParameter = nullptr;
 
   juce::dsp::ProcessorDuplicator<juce::dsp::IIR::Filter<float>, juce::dsp::IIR::Coefficients<float>> highpassFilter;
@@ -127,7 +131,7 @@ private:
   void applyFinalDCBlocking(juce::AudioBuffer<float> &buffer);
   void updateFilterParameters();
   void updateDiffusionFilters();
-  float processDiffusionFilters(float input);
+  float processDiffusionFilters(float input, int channel);
   float applyBitcrushing(float sample, float bitcrushAmount, float waveshapeAmount);
   float applyLFO(float baseValue, float lfoAmount, float lfoValue, float minValue, float maxValue);
   float applyLFOToPan(float basePan, float lfoAmount, float lfoValue);

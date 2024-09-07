@@ -10,7 +10,11 @@ AudioDelayAudioProcessor::AudioDelayAudioProcessor()
       parameters(*this, nullptr, "Parameters", createParameterLayout()),
       lastKnownBPM(120.0),
       lfoManager(),
-      delayManager()
+      delayManager(),
+      chorusRate(1.0f),
+      chorusDepth(0.02f),
+      chorusPhase(0.0f),
+      chorusPhaseIncrement(0.0f)
 {
     DBG("AudioDelayAudioProcessor constructor called");
     delayParameter = parameters.getRawParameterValue("delay");
@@ -149,52 +153,107 @@ void AudioDelayAudioProcessor::updateDiffusionFilters()
     float smearAmount = smearParameter->load();
     float sampleRate = static_cast<float>(getSampleRate());
 
+    // Adjust diffusion curve: start medium, then decrease as smear increases
+    float diffusionCurve = 0.5f * (1.0f - std::pow(smearAmount, 0.5f));
+
     float delayTimes[4] = {0.0007f, 0.0011f, 0.0013f, 0.0017f}; // in seconds
-    float feedbackAmounts[4] = {0.2f, 0.25f, 0.3f, 0.35f};      // Reduced feedback amounts
+    float maxFeedbackAmounts[4] = {0.3f, 0.35f, 0.4f, 0.45f};   // Maximum feedback amounts
 
     for (size_t i = 0; i < 4; ++i)
     {
         float delayTime = juce::jmax(0.00001f, delayTimes[i]);
-        float feedback = juce::jmap(smearAmount, 0.0f, feedbackAmounts[i]);
+        float feedback = maxFeedbackAmounts[i] * diffusionCurve;
 
         float frequency = juce::jlimit(20.0f, sampleRate * 0.49f, 1.0f / delayTime);
-        float q = juce::jlimit(0.01f, 100.0f, 1.0f / (2.0f * (1.0f - feedback)));
+        float q = juce::jlimit(0.01f, 10.0f, 1.0f / (2.0f * (1.0f - feedback))); // Reduced maximum Q
 
         diffusionFilters[i].setCutoffFrequency(frequency);
         diffusionFilters[i].setResonance(q);
     }
 
     // Update pre and post diffusion lowpass filters
-    float lowpassFreq = juce::jmap(smearAmount, 20000.0f, 5000.0f);
+    float lowpassFreq = juce::jmap(smearAmount, 20000.0f, 10000.0f);
     preDiffusionLowpass.setCutoffFrequency(lowpassFreq);
     postDiffusionLowpass.setCutoffFrequency(lowpassFreq);
-}
 
-float AudioDelayAudioProcessor::processDiffusionFilters(float input)
-{
-    float output = preDiffusionLowpass.processSample(0, input);
-
-    float smearAmount = smearParameter->load();
-
-    for (size_t i = 0; i < diffusionFilters.size(); ++i)
+    // Update chorus parameters
+    if (smearAmount > 0.0f)
     {
-        // Calculate modulated delay time for chorusing, scaled by smear amount
-        float modulation = std::sin(chorusPhase + i * 1.0f) * chorusDepth * smearAmount;
-        float modulatedFrequency = juce::jlimit(20.0f, static_cast<float>(getSampleRate()) * 0.49f, diffusionFilters[i].getCutoffFrequency() * (1.0f + modulation));
+        // Slower increase in chorus rate
+        chorusRate = 0.2f + smearAmount * 0.8f; // Chorus rate from 0.2 Hz to 1.0 Hz
 
-        // Update filter parameters
-        diffusionFilters[i].setCutoffFrequency(modulatedFrequency);
+        // More subtle increase in chorus depth
+        chorusDepth = std::pow(smearAmount, 1.5f) * 0.005f; // Non-linear increase, up to 5 ms
 
-        // Process the sample
-        output = diffusionFilters[i].processSample(0, output);
+        chorusPhaseIncrement = (chorusRate * juce::MathConstants<float>::twoPi) / sampleRate;
+
+        // Update chorus lowpass filter
+        float chorusCutoff = juce::jmap(smearAmount, 10000.0f, 15000.0f);
+        *chorusLowpass.coefficients = *juce::dsp::IIR::Coefficients<float>::makeLowPass(sampleRate, chorusCutoff);
+
+        DBG("Chorus parameters updated - Rate: " << chorusRate << " Hz, Depth: " << chorusDepth << ", Cutoff: " << chorusCutoff << " Hz");
+    }
+    else
+    {
+        chorusRate = 0.0f;
+        chorusDepth = 0.0f;
+        chorusPhaseIncrement = 0.0f;
+        DBG("Chorus disabled");
     }
 
-    output = postDiffusionLowpass.processSample(0, output);
+    DBG("Diffusion filters updated - Smear Amount: " << smearAmount
+                                                     << ", Diffusion Curve: " << diffusionCurve
+                                                     << ", Pre/Post Lowpass Freq: " << lowpassFreq
+                                                     << ", Diffusion Filter 0 Freq: " << diffusionFilters[0].getCutoffFrequency()
+                                                     << ", Q: " << diffusionFilters[0].getResonance());
+}
 
-    // Soft clipping to reduce potential distortion
-    output = std::tanh(output);
+float AudioDelayAudioProcessor::processDiffusionFilters(float input, int channel)
+{
+    float smearAmount = smearParameter->load();
 
-    return output;
+    if (smearAmount <= 0.0f)
+    {
+        return input;
+    }
+
+    float output = preDiffusionLowpass.processSample(channel, input);
+
+    // Improved chorus effect
+    float chorusModulation = chorusDepth * (std::sin(chorusPhase + (channel * juce::MathConstants<float>::pi * 0.5f)) * 0.5f + 0.5f);
+    if (channel == 0)
+    {
+        chorusPhase += chorusPhaseIncrement;
+        if (chorusPhase >= juce::MathConstants<float>::twoPi)
+            chorusPhase -= juce::MathConstants<float>::twoPi;
+    }
+
+    // Use smoother interpolation for chorus
+    float delayInSamples = chorusModulation * getSampleRate();
+    float chorusOutput = chorusDelayLine.popSample(channel, delayInSamples, true); // Use internal interpolation
+
+    chorusDelayLine.pushSample(channel, input);
+
+    // Apply lowpass filter to chorus output
+    chorusOutput = chorusLowpass.processSample(chorusOutput);
+
+    // Diffusion processing with smoother parameter changes
+    for (size_t i = 0; i < diffusionFilters.size(); ++i)
+    {
+        float modulatedFrequency = diffusionFilters[i].getCutoffFrequency() * (1.0f + chorusModulation * 0.1f);
+        diffusionFilters[i].setCutoffFrequency(modulatedFrequency);
+        output = diffusionFilters[i].processSample(channel, output);
+    }
+
+    output = postDiffusionLowpass.processSample(channel, output);
+
+    // Smooth mixing of dry, chorus, and diffused signals
+    float wetAmount = smearAmount;
+    float dryAmount = 1.0f - wetAmount;
+
+    float mixedOutput = input * dryAmount + (chorusOutput * 0.6f + output * 0.4f) * wetAmount;
+
+    return mixedOutput;
 }
 
 void AudioDelayAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
@@ -203,6 +262,12 @@ void AudioDelayAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBl
     spec.sampleRate = sampleRate;
     spec.maximumBlockSize = static_cast<juce::uint32>(samplesPerBlock);
     spec.numChannels = static_cast<juce::uint32>(getTotalNumOutputChannels());
+
+    chorusDelayLine.prepare(spec);
+    chorusDelayLine.setMaximumDelayInSamples(getSampleRate() * 0.05f + 3); // 50 ms + 3 samples for cubic interpolation
+
+    chorusLowpass.prepare(spec);
+    chorusLowpass.coefficients = juce::dsp::IIR::Coefficients<float>::makeLowPass(sampleRate, 10000.0f);
 
     convolution.prepare(spec);
     waveShaper.prepare(spec);
@@ -454,7 +519,7 @@ float AudioDelayAudioProcessor::processDelaySample(int channel, float delayInSam
     // Apply diffusion if smear is active
     if (smearAmount > 0.0f)
     {
-        float diffusedSample = processDiffusionFilters(delaySample);
+        float diffusedSample = processDiffusionFilters(delaySample, channel);
         delaySample = juce::jmap(smearAmount, delaySample, diffusedSample);
     }
 
@@ -508,6 +573,9 @@ void AudioDelayAudioProcessor::processDelayAndEffects(int channel, int sample, c
 
     // Process delay sample with both LFO modulation and smear
     float delaySample = processDelaySample(channel, delayInSamples, smearAmount, lfoModulation);
+
+    // Apply smear (diffusion and chorus) to the delayed signal
+    delaySample = processDiffusionFilters(delaySample, channel);
 
     // Apply bitcrushing to the delayed signal
     if (modifiedBitcrush < 16.0f)
